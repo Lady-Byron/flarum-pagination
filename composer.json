@@ -1,30 +1,47 @@
 {
-  "name": "block-cat/pagination",
-  "description": "Add pagination for Flarum forum",
-  "keywords": [
-    "flarum"
-  ],
-  "type": "flarum-extension",
-  "license": "MIT",
-  "require": {
-    "flarum/core": "^1.2"
-  },
-  "authors": [{
-    "name": "BlockCat"
-  }],
-  "autoload": {
-    "psr-4": {
-      "BlockCat\\Pagination\\": "src/"
+    "name": "lrysia/pagination",
+    "description": "Add pagination for DiscussionList(DL) in your flarum.(Forked from block-cat/pagination.)",
+    "keywords": [
+        "flarum",
+        "extension",
+        "pagination"
+    ],
+    "type": "flarum-extension",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "lrysia"
+        },
+        {
+            "name": "BlockCat",
+            "role": "original author"
+        }
+    ],
+    "support": {
+        "issues": "hhttps://github.com/lrysia/flarum-pagination/issues",
+        "source": "https://github.com/lrysia/flarum-pagination"
+    },
+    "require": {
+        "flarum/core": "^1.2"
+    },
+    "extra": {
+        "flarum-extension": {
+            "title": "DL Pagination",
+            "icon": {
+                "name": "fas fa-book",
+                "backgroundColor": "#146EBE",
+                "color": "#fff"
+            }
+        }
+    },
+    "autoload": {
+        "psr-4": {
+              "Lrysia\\Pagination\\": "src/"
+        },
+        "files": [
+              "src/Overrides/Api/Controller/AbstractSerializeController.php",
+              "src/Overrides/Filter/AbstractFilterer.php",
+              "src/Overrides/Search/AbstractSearcher.php"
+        ]
     }
-  },
-  "extra": {
-    "flarum-extension": {
-      "title": "BkC Pagination",
-      "icon": {
-        "name": "fas fa-dizzy",
-        "backgroundColor": "#083",
-        "color": "#fff"
-      }
-    }
-  }
 }

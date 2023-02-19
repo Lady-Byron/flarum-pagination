@@ -1,2 +1,152 @@
-module.exports=function(t){var n={};function a(o){if(n[o])return n[o].exports;var i=n[o]={i:o,l:!1,exports:{}};return t[o].call(i.exports,i,i.exports,a),i.l=!0,i.exports}return a.m=t,a.c=n,a.d=function(t,n,o){a.o(t,n)||Object.defineProperty(t,n,{enumerable:!0,get:o})},a.r=function(t){"undefined"!=typeof Symbol&&Symbol.toStringTag&&Object.defineProperty(t,Symbol.toStringTag,{value:"Module"}),Object.defineProperty(t,"__esModule",{value:!0})},a.t=function(t,n){if(1&n&&(t=a(t)),8&n)return t;if(4&n&&"object"==typeof t&&t&&t.__esModule)return t;var o=Object.create(null);if(a.r(o),Object.defineProperty(o,"default",{enumerable:!0,value:t}),2&n&&"string"!=typeof t)for(var i in t)a.d(o,i,function(n){return t[n]}.bind(null,i));return o},a.n=function(t){var n=t&&t.__esModule?function(){return t.default}:function(){return t};return a.d(n,"a",n),n},a.o=function(t,n){return Object.prototype.hasOwnProperty.call(t,n)},a.p="",a(a.s=15)}([function(t,n){t.exports=flarum.core.compat.app},,,,,function(t,n){t.exports=flarum.core.compat["utils/saveSettings"]},,,,,,,,function(t,n){t.exports=flarum.core.compat["common/components/ExtensionPage"]},function(t,n){t.exports=flarum.core.compat["common/components/Select"]},function(t,n,a){"use strict";function o(t,n){return(o=Object.setPrototypeOf||function(t,n){return t.__proto__=n,t})(t,n)}a.r(n);var i=a(13),e=a.n(i),r=a(0),c=a.n(r),p=a(14),s=a.n(p),l=a(5),u=a.n(l),g=function(t){var n,a;function i(){return t.apply(this,arguments)||this}a=t,(n=i).prototype=Object.create(a.prototype),n.prototype.constructor=n,o(n,a);var e=i.prototype;return e.oninit=function(n){t.prototype.oninit.call(this,n),this.paginationPositionOptions={none:c.a.translator.trans("block-cat-pagination.admin.settings.pagination.position.none"),above:c.a.translator.trans("block-cat-pagination.admin.settings.pagination.position.above"),under:c.a.translator.trans("block-cat-pagination.admin.settings.pagination.position.under"),both:c.a.translator.trans("block-cat-pagination.admin.settings.pagination.position.both")},this.paginationPosition=c.a.data.settings["block-cat.pagination_position"],this.articlePerPage=c.a.data.settings["block-cat.article_per_page"]},e.content=function(){var t=this;return[m(".ExtensionPage-settings",[m(".container",[m("Form",[m(".Form-group",[m("label",c.a.translator.trans("block-cat-pagination.admin.settings.pagination.position_label")),m(".helpText",c.a.translator.trans("block-cat-pagination.admin.settings.pagination.position_help_text")),s.a.component({options:this.paginationPositionOptions,value:this.paginationPosition||"none",onchange:function(n){var a;t.paginationPosition=n,u()(((a={})["block-cat.pagination_position"]=t.paginationPosition,a))}})]),m(".Form-group",[m("label",c.a.translator.trans("block-cat-pagination.admin.settings.pagination.articlePage_label")),m(".helpText",c.a.translator.trans("block-cat-pagination.admin.settings.pagination.articlePage_help_text")),m("input.FormControl",{type:"number",min:1,max:50,step:1,placeholder:20,value:this.articlePerPage,onchange:function(n){var a;t.articlePerPage=n.target.value,t.articlePerPage=Math.min(Math.max(1,t.articlePerPage),50),u()(((a={})["block-cat.article_per_page"]=t.articlePerPage,a))}})])])])])]},i}(e.a);app.initializers.add("block-cat/pagination",(function(){app.extensionData.for("block-cat-pagination").registerPage(g)}))}]);
+/******/ (() => { // webpackBootstrap
+/******/ 	// runtime can't be in strict mode because a global variable is assign and maybe created.
+/******/ 	var __webpack_modules__ = ({
+
+/***/ "./src/admin/index.js":
+/*!****************************!*\
+  !*** ./src/admin/index.js ***!
+  \****************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony import */ var flarum_admin_app__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! flarum/admin/app */ "flarum/admin/app");
+/* harmony import */ var flarum_admin_app__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(flarum_admin_app__WEBPACK_IMPORTED_MODULE_0__);
+
+flarum_admin_app__WEBPACK_IMPORTED_MODULE_0___default().initializers.add('lrysia/pagination', function () {
+  flarum_admin_app__WEBPACK_IMPORTED_MODULE_0___default().extensionData["for"]('lrysia-pagination').registerSetting({
+    label: flarum_admin_app__WEBPACK_IMPORTED_MODULE_0___default().translator.trans('Lrysia-DLP.admin.settings.pagination.CanUserPref'),
+    setting: 'LrysiaPagination.CanUserPref',
+    type: 'boolean'
+  }).registerSetting({
+    label: flarum_admin_app__WEBPACK_IMPORTED_MODULE_0___default().translator.trans('Lrysia-DLP.admin.settings.pagination.PaginationFirst'),
+    help: flarum_admin_app__WEBPACK_IMPORTED_MODULE_0___default().translator.trans('Lrysia-DLP.admin.settings.pagination.PaginationFirst-Help'),
+    setting: 'LrysiaPagination.PaginationFirst',
+    type: 'boolean'
+  }).registerSetting({
+    label: flarum_admin_app__WEBPACK_IMPORTED_MODULE_0___default().translator.trans('Lrysia-DLP.admin.settings.pagination.NavBarPosition'),
+    setting: 'LrysiaPagination.NavBarPosition',
+    options: {
+      'above': flarum_admin_app__WEBPACK_IMPORTED_MODULE_0___default().translator.trans('Lrysia-DLP.admin.settings.pagination.Position.Above'),
+      'under': flarum_admin_app__WEBPACK_IMPORTED_MODULE_0___default().translator.trans('Lrysia-DLP.admin.settings.pagination.Position.Under'),
+      'both': flarum_admin_app__WEBPACK_IMPORTED_MODULE_0___default().translator.trans('Lrysia-DLP.admin.settings.pagination.Position.Both')
+    },
+    type: 'select'
+  }).registerSetting({
+    label: flarum_admin_app__WEBPACK_IMPORTED_MODULE_0___default().translator.trans('Lrysia-DLP.admin.settings.pagination.PerPage'),
+    setting: 'LrysiaPagination.PerPage',
+    type: 'number',
+    min: 1,
+    max: 50
+  }).registerSetting({
+    label: flarum_admin_app__WEBPACK_IMPORTED_MODULE_0___default().translator.trans('Lrysia-DLP.admin.settings.pagination.PerIndexInit'),
+    setting: 'LrysiaPagination.PerIndexInit',
+    type: 'number',
+    min: 1,
+    max: 50
+  }).registerSetting({
+    label: flarum_admin_app__WEBPACK_IMPORTED_MODULE_0___default().translator.trans('Lrysia-DLP.admin.settings.pagination.PerLoadMore'),
+    setting: 'LrysiaPagination.PerLoadMore',
+    type: 'number',
+    min: 1,
+    max: 50
+  });
+});
+
+/***/ }),
+
+/***/ "flarum/admin/app":
+/*!**************************************************!*\
+  !*** external "flarum.core.compat['admin/app']" ***!
+  \**************************************************/
+/***/ ((module) => {
+
+"use strict";
+module.exports = flarum.core.compat['admin/app'];
+
+/***/ })
+
+/******/ 	});
+/************************************************************************/
+/******/ 	// The module cache
+/******/ 	var __webpack_module_cache__ = {};
+/******/ 	
+/******/ 	// The require function
+/******/ 	function __webpack_require__(moduleId) {
+/******/ 		// Check if module is in cache
+/******/ 		var cachedModule = __webpack_module_cache__[moduleId];
+/******/ 		if (cachedModule !== undefined) {
+/******/ 			return cachedModule.exports;
+/******/ 		}
+/******/ 		// Create a new module (and put it into the cache)
+/******/ 		var module = __webpack_module_cache__[moduleId] = {
+/******/ 			// no module.id needed
+/******/ 			// no module.loaded needed
+/******/ 			exports: {}
+/******/ 		};
+/******/ 	
+/******/ 		// Execute the module function
+/******/ 		__webpack_modules__[moduleId](module, module.exports, __webpack_require__);
+/******/ 	
+/******/ 		// Return the exports of the module
+/******/ 		return module.exports;
+/******/ 	}
+/******/ 	
+/************************************************************************/
+/******/ 	/* webpack/runtime/compat get default export */
+/******/ 	(() => {
+/******/ 		// getDefaultExport function for compatibility with non-harmony modules
+/******/ 		__webpack_require__.n = (module) => {
+/******/ 			var getter = module && module.__esModule ?
+/******/ 				() => (module['default']) :
+/******/ 				() => (module);
+/******/ 			__webpack_require__.d(getter, { a: getter });
+/******/ 			return getter;
+/******/ 		};
+/******/ 	})();
+/******/ 	
+/******/ 	/* webpack/runtime/define property getters */
+/******/ 	(() => {
+/******/ 		// define getter functions for harmony exports
+/******/ 		__webpack_require__.d = (exports, definition) => {
+/******/ 			for(var key in definition) {
+/******/ 				if(__webpack_require__.o(definition, key) && !__webpack_require__.o(exports, key)) {
+/******/ 					Object.defineProperty(exports, key, { enumerable: true, get: definition[key] });
+/******/ 				}
+/******/ 			}
+/******/ 		};
+/******/ 	})();
+/******/ 	
+/******/ 	/* webpack/runtime/hasOwnProperty shorthand */
+/******/ 	(() => {
+/******/ 		__webpack_require__.o = (obj, prop) => (Object.prototype.hasOwnProperty.call(obj, prop))
+/******/ 	})();
+/******/ 	
+/******/ 	/* webpack/runtime/make namespace object */
+/******/ 	(() => {
+/******/ 		// define __esModule on exports
+/******/ 		__webpack_require__.r = (exports) => {
+/******/ 			if(typeof Symbol !== 'undefined' && Symbol.toStringTag) {
+/******/ 				Object.defineProperty(exports, Symbol.toStringTag, { value: 'Module' });
+/******/ 			}
+/******/ 			Object.defineProperty(exports, '__esModule', { value: true });
+/******/ 		};
+/******/ 	})();
+/******/ 	
+/************************************************************************/
+var __webpack_exports__ = {};
+// This entry need to be wrapped in an IIFE because it need to be in strict mode.
+(() => {
+"use strict";
+/*!******************!*\
+  !*** ./admin.js ***!
+  \******************/
+__webpack_require__.r(__webpack_exports__);
+/* harmony import */ var _src_admin__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./src/admin */ "./src/admin/index.js");
+
+})();
+
+module.exports = __webpack_exports__;
+/******/ })()
+;
 //# sourceMappingURL=admin.js.map

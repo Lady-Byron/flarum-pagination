@@ -1,0 +1,22 @@
+Lrysia-DLP:
+  admin:
+    settings:
+      pagination:
+        CanUserPref: 允许用户自行设置“主题帖列表”的加载模式
+        PaginationFirst: 论坛启用分页加载模式
+        PaginationFirst-Help: '分页模式将同时应用于 论坛主页 与 用户个人页 内的"主题帖列表"'
+        NavBarPosition: 分页导航条在页面中的位置
+        PerPage: '分页式: 单页”主题贴列表“的容量(1-50)'
+        PerLoadMore: '下拉式: 单次”加载更多“的获取量(1-50)'
+        PerIndexInit: '下拉式: 列表初次加载时的获取量(1-50)'
+        Position:
+          Above: 顶端
+          Under: 底端
+          Both: 两端
+
+  forum:
+    user:
+      settings:
+        Head: 主题帖列表-加载模式
+        DLP_UserCustom: 启用个性化选择(关闭时,按论坛预设的默认模式进行加载)
+        DLP_UserPaginationFirst: 启用分页模式

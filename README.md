@@ -1,4 +1,4 @@
-# BkC Pagination
+# lrysia DL Pagination
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg) [![Latest Stable Version](https://img.shields.io/packagist/v/block-cat/pagination.svg)](https://packagist.org/packages/block-cat/pagination)
 

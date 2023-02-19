@@ -1,13 +1,22 @@
-block-cat-pagination:
+Lrysia-DLP:
   admin:
     settings:
       pagination:
-        position_label: "Pagination position"
-        position_help_text: "Select pagination position"
-        articlePage_label: "Articles per page"
-        articlePage_help_text: "Select number of articles per page"
-        position:
-          none: "Default"
-          above: "Above"
-          under: "Under"
-          both: "Both"
+        CanUserPref: Allow users to set the loading mode of DiscussionList
+        PaginationFirst: Enable pagination mode
+        PaginationFirst-Help:   'Pagination mode will be applied to both forum home page and user personal page'
+        NavBarPosition: Select position of pagination navigation bar
+        PerPage: "Pagination Mode: Capacity of DiscussionList per page (1-50)"
+        PerLoadMore: 'LoadMore Mode: The amount of discussions per LoadMore (1-50)'
+        PerIndexInit: 'LoadMore Mode: The amount of discussions in first page (1-50)'
+        Position:
+          Above: Above
+          Under: Under
+          Both: Both
+
+  forum:
+    user:
+      settings:
+        Head: DiscussionList - Loading Mode
+        DLP_UserCustom: Enable personalization (When closed, load by forum preset mode)
+        DLP_UserPaginationFirst: Enable pagination mode
