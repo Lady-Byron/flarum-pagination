@@ -58,16 +58,6 @@ abstract class AbstractSearcher
 
 
         // added by lrysia/pagination
-        // 1. $query是Eloquent/builder，调用 getQuery() 返回的是个 Query/builder
-        // 2. 直接用 $query->count()时，实为 Query/builder->count()
-        // 3. Query/builder->count() 再次调用 Query/builder->aggregate()
-        // 4. 在"搜索"情景下，aggregate() 的返回结果不是我们需要的
-        // 5. 在"搜索"情景下，aggregate() 中的 $result->items 会变成包含多个对象的列表
-        // 6. 而在"filter"情境下，$result->items 始终是只包含一个对象的列表
-        // 7. 在"搜索"情景下，列表中的每个对象代表一个帖子，而每个对象的count数代表该帖子内符合查询条件的条目数
-        // 8. 在"filter"情境下，列表只有一个对象，这个对象的count数就是符合查询条件的帖子数
-        // 9. 观察到 aggregate() 的 return 硬编码了“[0]”，这导致返回值始终是列表内第一个对象的count数
-        // 10. 基于避免修改原函数的原则，这里给 Query/builder 添加了一个能正确返回"搜索"情景下count数的新方法
         QBulider::macro( 'countForSearch', function ($function='count',$columns=['*']) {
             $results = $this->cloneWithout($this->unions || $this->havings ? [] : ['columns'])
                 ->cloneWithoutBindings($this->unions || $this->havings ? [] : ['select'])
