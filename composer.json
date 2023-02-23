@@ -1,6 +1,6 @@
 {
     "name": "lrysia/pagination",
-    "description": "Add pagination for DiscussionList(DL) in your flarum.(Forked from block-cat/pagination.)",
+    "description": "Add pagination for DiscussionList(DL) in your flarum. (Forked from block-cat/pagination.)",
     "keywords": [
         "flarum",
         "extension",
@@ -15,6 +15,7 @@
         },
         {
             "name": "BlockCat",
+            "homepage": "https://github.com/block-cat",
             "role": "original author"
         }
     ],
