@@ -1,7 +1,7 @@
 <?php
 
 /*
- * This file is part of lrysia/pagination.
+ * This file is part of nodeloc/pagination.
  *
  * Copyright (c) 2023 .
  *
@@ -9,7 +9,7 @@
  * file that was distributed with this source code.
  */
 
-namespace Lrysia\Pagination;
+namespace Nodeloc\Pagination;
 
 use Flarum\Extend;
 
@@ -24,18 +24,18 @@ return [
         ->css(__DIR__.'/resources/less/admin.less'),
 
     (new Extend\Settings())
-        -> serializeToForum('LrysiaPagination.CanUserPref', 'LrysiaPagination.CanUserPref', 'boolVal')
-        -> serializeToForum('LrysiaPagination.PaginationFirst', 'LrysiaPagination.PaginationFirst', 'boolVal')
-        -> serializeToForum('LrysiaPagination.PerPage', 'LrysiaPagination.PerPage', 'intVal')
-        -> serializeToForum('LrysiaPagination.PerIndexInit', 'LrysiaPagination.PerIndexInit', 'intVal')
-        -> serializeToForum('LrysiaPagination.PerLoadMore', 'LrysiaPagination.PerLoadMore', 'intVal')
-        -> serializeToForum('LrysiaPagination.NavBarPosition', 'LrysiaPagination.NavBarPosition')
-        -> default('LrysiaPagination.CanUserPref', false)
-        -> default('LrysiaPagination.PaginationFirst', true)
-        -> default('LrysiaPagination.PerPage', 20)
-        -> default('LrysiaPagination.PerIndexInit', 20)
-        -> default('LrysiaPagination.PerLoadMore', 20)
-        -> default('LrysiaPagination.NavBarPosition', 'under'),
+        -> serializeToForum('NodelocPagination.CanUserPref', 'NodelocPagination.CanUserPref', 'boolVal')
+        -> serializeToForum('NodelocPagination.PaginationFirst', 'NodelocPagination.PaginationFirst', 'boolVal')
+        -> serializeToForum('NodelocPagination.PerPage', 'NodelocPagination.PerPage', 'intVal')
+        -> serializeToForum('NodelocPagination.PerIndexInit', 'NodelocPagination.PerIndexInit', 'intVal')
+        -> serializeToForum('NodelocPagination.PerLoadMore', 'NodelocPagination.PerLoadMore', 'intVal')
+        -> serializeToForum('NodelocPagination.NavBarPosition', 'NodelocPagination.NavBarPosition')
+        -> default('NodelocPagination.CanUserPref', false)
+        -> default('NodelocPagination.PaginationFirst', true)
+        -> default('NodelocPagination.PerPage', 20)
+        -> default('NodelocPagination.PerIndexInit', 20)
+        -> default('NodelocPagination.PerLoadMore', 20)
+        -> default('NodelocPagination.NavBarPosition', 'under'),
 
     (new Extend\User())
         ->registerPreference('DLP_UserCustom', 'boolVal', false)

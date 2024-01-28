@@ -12,18 +12,18 @@ import addUserPreference from "./addUserPreference";
 import determineMode from "./determineMode";
 
 
-app.initializers.add('lrysia/pagination', () => {
+app.initializers.add('nodeloc/pagination', () => {
 
   // Add user preferences components
   addUserPreference();
 
   override(DiscussionListState.prototype, 'refresh', function (original) {
 
-    // params set by lrysia/pagination
+    // params set by nodeloc/pagination
     this.options = {
-      perPage: Number(app.forum.attribute('LrysiaPagination.PerPage')),
-      perLoadMore: Number(app.forum.attribute('LrysiaPagination.PerLoadMore')),
-      perIndexInit: Number(app.forum.attribute('LrysiaPagination.PerIndexInit')),
+      perPage: Number(app.forum.attribute('NodelocPagination.PerPage')),
+      perLoadMore: Number(app.forum.attribute('NodelocPagination.PerLoadMore')),
+      perIndexInit: Number(app.forum.attribute('NodelocPagination.PerIndexInit')),
       leftEdges: 4,
       rightEdges: 5,
     };
@@ -82,7 +82,7 @@ app.initializers.add('lrysia/pagination', () => {
       ...reqParams,
       page: {
         ...reqParams.page,
-        // request params(SQL-query) replaced by lrysia/pagination
+        // request params(SQL-query) replaced by nodeloc/pagination
         offset: newOffset,
         limit: newLimit
       },
@@ -138,7 +138,7 @@ app.initializers.add('lrysia/pagination', () => {
 
 
 
-    // ATTENTION! THIS IS THE CORE OF lrysia/pagination(1.0.0)
+    // ATTENTION! THIS IS THE CORE OF nodeloc/pagination(1.0.0)
     // Total number of discussions matching this SQL-query
     // (this interface is implemented by overriding the Flarum's backend source code)
     this.totalDiscussionCount = Stream(arguments[2].payload.jsonapi.totalResultsCount);
@@ -313,7 +313,7 @@ app.initializers.add('lrysia/pagination', () => {
 
       //
       function JumpFunc(){
-        let input = parseInt(document.getElementById('lrysia-inputJump').value);
+        let input = parseInt(document.getElementById('nodeloc-inputJump').value);
         // 跳转前检查页码合法性
         if (Number.isFinite(input) && Number.isSafeInteger(input)) {
           if (input != state.page().number) {
@@ -324,7 +324,7 @@ app.initializers.add('lrysia/pagination', () => {
         }
       }
       let inputJump = m('input.FromControl', {
-        id: 'lrysia-inputJump',
+        id: 'nodeloc-inputJump',
         placeholder: state.page().number === undefined ? '' : `${state.page().number}`,
         onkeydown: (event) => {
           event.redraw = false;
@@ -376,11 +376,11 @@ app.initializers.add('lrysia/pagination', () => {
       }
 
       //
-      app.forum.attribute('LrysiaPagination.NavBarPosition') == 'above' && !state.isLoading()
+      app.forum.attribute('NodelocPagination.NavBarPosition') == 'above' && !state.isLoading()
         ? view.children.unshift(m(toolbar, {groupbuttons: buttons})) : '';
-      app.forum.attribute('LrysiaPagination.NavBarPosition') == 'under' && !state.isLoading()
+      app.forum.attribute('NodelocPagination.NavBarPosition') == 'under' && !state.isLoading()
         ? view.children.push(m(toolbar, {groupbuttons: buttons})) : '';
-      app.forum.attribute('LrysiaPagination.NavBarPosition') == 'both' && !state.isLoading()
+      app.forum.attribute('NodelocPagination.NavBarPosition') == 'both' && !state.isLoading()
         ? view.children.unshift(m(toolbar, {groupbuttons: buttons}))
         && view.children.push(m(toolbar, {groupbuttons: buttons})) : '';
 

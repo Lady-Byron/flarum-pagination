@@ -1,5 +1,5 @@
 {
-    "name": "lrysia/pagination",
+    "name": "nodeloc/pagination",
     "description": "Add pagination for DiscussionList(DL) in your flarum. (Forked from block-cat/pagination.)",
     "keywords": [
         "flarum",
@@ -10,8 +10,12 @@
     "license": "MIT",
     "authors": [
         {
-            "name": "lrysia",
-            "homepage": "https://github.com/lrysia"
+            "name": "Nodeloc",
+            "homepage": "https://github.com/nodeloc"
+        },
+        {
+            "name": "nodeloc",
+            "homepage": "https://github.com/nodeloc"
         },
         {
             "name": "BlockCat",
@@ -20,8 +24,8 @@
         }
     ],
     "support": {
-        "issues": "https://github.com/lrysia/flarum-pagination/issues",
-        "source": "https://github.com/lrysia/flarum-pagination"
+        "issues": "https://github.com/nodeloc/flarum-pagination/issues",
+        "source": "https://github.com/nodeloc/flarum-pagination"
     },
     "require": {
         "flarum/core": "^1.2"
@@ -38,7 +42,7 @@
     },
     "autoload": {
         "psr-4": {
-              "Lrysia\\Pagination\\": "src/"
+              "nodeloc\\Pagination\\": "src/"
         },
         "files": [
               "src/Overrides/Api/Controller/AbstractSerializeController.php",

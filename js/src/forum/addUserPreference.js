@@ -13,24 +13,24 @@ export default function () {
   });
 
   extend(SettingsPage.prototype, 'settingsItems', function (items) {
-    if (Boolean(app.forum.attribute('LrysiaPagination.CanUserPref'))) {
+    if (Boolean(app.forum.attribute('NodelocPagination.CanUserPref'))) {
       items.add(
-        'Lrysia_DLP_User',
+        'Nodeloc_DLP_User',
         FieldSet.component(
           {
-            label: app.translator.trans('Lrysia-DLP.forum.user.settings.Head'),
-            className: 'Lrysia_DLP_PrefSettings',
+            label: app.translator.trans('Nodeloc-DLP.forum.user.settings.Head'),
+            className: 'Nodeloc_DLP_PrefSettings',
           },
-          this.Lrysia_DLP_UserPrefItems().toArray()
+          this.Nodeloc_DLP_UserPrefItems().toArray()
         )
       );
     }
   });
 
-  SettingsPage.prototype['Lrysia_DLP_UserPrefItems'] = function () {
+  SettingsPage.prototype['Nodeloc_DLP_UserPrefItems'] = function () {
     const items = new ItemList();
     items.add(
-      'Lrysia_DLP_UserCustom',
+      'Nodeloc_DLP_UserCustom',
       Switch.component(
         {
           state: this.user.preferences().DLP_UserCustom,
@@ -43,13 +43,13 @@ export default function () {
           },
           loading: this.UserCustomLoading,
         },
-        app.translator.trans('Lrysia-DLP.forum.user.settings.DLP_UserCustom')
+        app.translator.trans('Nodeloc-DLP.forum.user.settings.DLP_UserCustom')
       )
     );
 
     if (this.user.preferences().DLP_UserCustom) {
       items.add(
-        'Lrysia_DLP_UserPaginationFirst',
+        'Nodeloc_DLP_UserPaginationFirst',
         Switch.component(
           {
             state: this.user.preferences().DLP_UserPaginationFirst,
@@ -62,7 +62,7 @@ export default function () {
             },
             loading: this.UserPaginationFirstLoading,
           },
-          app.translator.trans('Lrysia-DLP.forum.user.settings.DLP_UserPaginationFirst')
+          app.translator.trans('Nodeloc-DLP.forum.user.settings.DLP_UserPaginationFirst')
         )
       );
     }

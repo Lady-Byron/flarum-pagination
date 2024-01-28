@@ -137,7 +137,7 @@ abstract class AbstractSerializeController implements RequestHandlerInterface
         $document->setData($element);
 
 
-        // added by lrysia/pagination
+        // added by nodeloc/pagination
         if(is_object($data) && property_exists($data,'totalResultsCount')){
             $document->setJsonapi(['totalResultsCount'=>$data->totalResultsCount]);
         }

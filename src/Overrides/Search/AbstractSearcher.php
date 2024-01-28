@@ -14,7 +14,7 @@ use Flarum\Query\QueryCriteria;
 use Flarum\Query\QueryResults;
 use Flarum\User\User;
 use Illuminate\Database\Eloquent\Builder;
-// added by lrysia/pagination
+// added by nodeloc/pagination
 use Illuminate\Database\Query\Builder as QBulider;
 
 abstract class AbstractSearcher
@@ -57,7 +57,7 @@ abstract class AbstractSearcher
         $this->gambits->apply($search, $criteria->query['q']);
 
 
-        // added by lrysia/pagination
+        // added by nodeloc/pagination
         QBulider::macro( 'countForSearch', function ($function='count',$columns=['*']) {
             $results = $this->cloneWithout($this->unions || $this->havings ? [] : ['columns'])
                 ->cloneWithoutBindings($this->unions || $this->havings ? [] : ['select'])
@@ -89,7 +89,7 @@ abstract class AbstractSearcher
         }
 
 
-        // added by lrysia/pagination
+        // added by nodeloc/pagination
         $results->totalResultsCount = $totalResultsCount;
 
 

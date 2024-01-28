@@ -67,7 +67,7 @@ abstract class AbstractFilterer
         }
 
 
-        // added by lrysia/pagination
+        // added by nodeloc/pagination
         $totalResultsCount = $query->count();
 
 
@@ -89,7 +89,7 @@ abstract class AbstractFilterer
         }
 
 
-        // added by lrysia/pagination
+        // added by nodeloc/pagination
         $results->totalResultsCount = $totalResultsCount;
 
 
