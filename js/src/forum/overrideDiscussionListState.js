@@ -8,6 +8,7 @@ import determineMode from './utils/determineMode';
 export default function () {
   DiscussionListState.prototype.initOptions = function () {
     this.options = {
+      cacheDiscussions: app.forum.attribute('foskym-pagination.cacheDiscussions'),
       perPage: app.forum.attribute('foskym-pagination.perPage'),
       perLoadMore: app.forum.attribute('foskym-pagination.perLoadMore'),
       perIndexInit: app.forum.attribute('foskym-pagination.perIndexInit'),
@@ -70,7 +71,7 @@ export default function () {
       return Promise.resolve(preloadedDiscussions);
     }
 
-    if (!this.isRefreshing) {
+    if (!this.isRefreshing && this.options.cacheDiscussions) {
       if (
         JSON.stringify(reqParams['include']) !== JSON.stringify(this.lastRquestParams['include']) ||
         reqParams['filter.q'] === this.lastRquestParams['filter.q'] ||
@@ -143,19 +144,25 @@ export default function () {
 
     this.totalDiscussionCount = Stream(results.payload.jsonapi.totalResultsCount);
 
-    if ((this.lastTotalDiscussionCount != this.totalDiscussionCount() && this.lastTotalDiscussionCount != 0) || this.lastTotalDiscussionCount === 0 || this.isRefreshing) {
-      // need to update the discussion list
-      this.lastTotalDiscussionCount = this.totalDiscussionCount();
-      for (let i = 0; i < this.lastTotalDiscussionCount; i++) {
-        this.lastDiscussions[i] = {};
+    if (this.options.cacheDiscussions) {
+      if (
+        (this.lastTotalDiscussionCount != this.totalDiscussionCount() && this.lastTotalDiscussionCount != 0) ||
+        this.lastTotalDiscussionCount === 0 ||
+        this.isRefreshing
+      ) {
+        // need to update the discussion list
+        this.lastTotalDiscussionCount = this.totalDiscussionCount();
+        for (let i = 0; i < this.lastTotalDiscussionCount; i++) {
+          this.lastDiscussions[i] = {};
+        }
+        this.lastLoadedPage = {};
+      } else {
+        // no need to update the discussion list
+        this.lastLoadedPage[pageNum] = page;
+        let start = this.options.perPage * (pageNum - 1);
+        let end = this.options.perPage * pageNum;
+        this.lastDiscussions.splice(start, end - start, ...results);
       }
-      this.lastLoadedPage = {};
-    } else {
-      // no need to update the discussion list
-      this.lastLoadedPage[pageNum] = page;
-      let start = this.options.perPage * (pageNum - 1);
-      let end = this.options.perPage * pageNum;
-      this.lastDiscussions.splice(start, end - start, ...results);
     }
 
     this.getTotalPages = function () {
@@ -274,6 +281,7 @@ export default function () {
     this.lastRquestParams = {};
     this.lastTotalDiscussionCount = 0;
     this.lastTotalPages = 0;
+    this.totalDiscussionCount = Stream(0);
     return original();
   });
 }

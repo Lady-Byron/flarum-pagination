@@ -13,6 +13,8 @@ foskym-pagination:
           above: Above
           under: Under
           both: Both
+        cacheDiscussions: Cache DiscussionList to reduce server load
+        cacheDiscussions-Help: 'Only for pagination mode, LoadMore mode is not affected. It is recommended to use with real-time notification plugins.'
 
   forum:
     user:

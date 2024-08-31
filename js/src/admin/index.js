@@ -14,6 +14,12 @@ app.initializers.add('foskym/flarum-pagination', () => {
       type: 'boolean',
     })
     .registerSetting({
+      label: app.translator.trans('foskym-pagination.admin.settings.pagination.cacheDiscussions'),
+      help: app.translator.trans('foskym-pagination.admin.settings.pagination.cacheDiscussions-Help'),
+      setting: 'foskym-pagination.cacheDiscussions',
+      type: 'boolean',
+    })
+    .registerSetting({
       label: app.translator.trans('foskym-pagination.admin.settings.pagination.paginationPosition'),
       setting: 'foskym-pagination.paginationPosition',
       options: {

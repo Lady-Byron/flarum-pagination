@@ -13,6 +13,8 @@ foskym-pagination:
           above: 顶端
           under: 底端
           both: 两端
+        cacheDiscussions: 缓存主题帖列表，以减少服务器负担
+        cacheDiscussions-Help: 仅适用于分页模式，下拉式模式不受影响。最好配合实时通知类插件使用。
 
   forum:
     user:
