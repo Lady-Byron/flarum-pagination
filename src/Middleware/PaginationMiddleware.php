@@ -35,6 +35,12 @@ class PaginationMiddleware implements MiddlewareInterface
                 $queryParams['page']['limit'] = $perPage;
                 $request = $request->withQueryParams($queryParams);
             }
+        } else {
+            $perIndexInit = $settings->get('foskym-pagination.perIndexInit') ?? 20;
+            if ($limit != $perIndexInit && $limit === 20) {
+                $queryParams['page']['limit'] = $perIndexInit;
+                $request = $request->withQueryParams($queryParams);
+            }
         }
         return $handler->handle($request);
     }
