@@ -23,8 +23,8 @@ class Filter
         $query = clone $query;
 
         $sql = $query->toSql();
-        $sql = str_replace('limit ' . $query->limit, '', $sql);
-        $sql = str_replace('offset ' . $query->offset, '', $sql);
+        $sql = preg_replace('/\s+limit\s+\d+/i', '', $sql);
+        $sql = preg_replace('/\s+offset\s+\d+/i', '', $sql);
         $bindings = $query->getBindings();
         $sql = str_replace('?', "'%s'", $sql);
         $sql = vsprintf($sql, $bindings);
