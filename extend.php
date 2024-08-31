@@ -12,6 +12,11 @@
 namespace FoskyM\Pagination;
 
 use Flarum\Extend;
+use Flarum\Api\Controller\AbstractSerializeController;
+use Flarum\Api\Controller\ListDiscussionsController;
+use Flarum\Filter\AbstractFilterer;
+use Flarum\Discussion\Filter\DiscussionFilterer;
+use Flarum\Discussion\Search\DiscussionSearcher;
 
 return [
 
@@ -22,6 +27,8 @@ return [
     (new Extend\Frontend('admin'))
         ->js(__DIR__.'/js/dist/admin.js')
         ->css(__DIR__.'/resources/less/admin.less'),
+
+    new Extend\Locales(__DIR__.'/resources/locale'),
 
     (new Extend\Settings())
         -> serializeToForum('foskym-pagination.canUserPref', 'foskym-pagination.canUserPref', 'boolVal')
@@ -41,6 +48,13 @@ return [
         ->registerPreference('foskym-pagination.userCustom', 'boolVal', false)
         ->registerPreference('foskym-pagination.userPaginationOnLoading', 'boolVal', true),
 
-    new Extend\Locales(__DIR__.'/resources/locale'),
+    (new Extend\ApiController(AbstractSerializeController::class))
+        ->prepareDataForSerialization(LoadPagination::class),
+
+    (new Extend\Filter(DiscussionFilterer::class))
+        ->addFilterMutator(Filter\Filter::class),
+
+    (new Extend\SimpleFlarumSearch(DiscussionSearcher::class))
+        ->addSearchMutator(Search\Search::class),
 
 ];
