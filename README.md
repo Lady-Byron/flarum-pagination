@@ -1,48 +1,32 @@
-# nodeloc DL Pagination
+# Pagination
 
-![License](https://img.shields.io/badge/license-MIT-blue.svg) [![Latest Stable Version](https://img.shields.io/packagist/v/block-cat/pagination.svg)](https://packagist.org/packages/block-cat/pagination)
+![License](https://img.shields.io/badge/license-MIT-blue.svg) [![Latest Stable Version](https://img.shields.io/packagist/v/foskym/flarum-pagination.svg)](https://packagist.org/packages/foskym/flarum-pagination) [![Total Downloads](https://img.shields.io/packagist/dt/foskym/flarum-pagination.svg)](https://packagist.org/packages/foskym/flarum-pagination)
 
-**Extensia nu este publicată pe [Packagist](https://packagist.org/)!**
+A [Flarum](http://flarum.org) extension. Add pagination for discussion list.
 
-Aceasta este o extensie [Flarum](https://flarum.org/) care oferă posibilitatea de înlocuire a paginării implicite din Flarum cu paginarea cu pagini.
+![image](https://github.com/user-attachments/assets/42082efc-e0fc-44be-af19-58a1902259ee)
 
-![](https://i.imgur.com/VVRCsE7.png)
+![image](https://github.com/user-attachments/assets/0a8ef763-c35a-4043-b5ea-956b6652b29f)
 
-În panoul de administrare poate fi setat locul unde să fie selectată poziția paginării, în partea de sus, jos sau, și sus, și jos, pe pagina principală. De asemenea, poate fi selectat numărul de articole de pe fiecare pagină.
 
-![](https://i.imgur.com/Kut3tzw.png)
+# Installation
 
-## Compatibilitate
-
-Această extensie este compatibilă cu versiunea `1.2.1` de [Flarum](https://flarum.org/).
-
-## Instalare
-
-Pentru instalarea extensiei trebuie executată următoarea comandă Composer:
+Install with composer:
 
 ```sh
-composer require block-cat/pagination *@dev
+composer require foskym/flarum-pagination:"*"
 ```
 
-## Actualizare
-
-Pentru actualizarea extensiei trebuie executată următoarea comandă Composer:
+## Updating
 
 ```sh
-composer update block-cat/pagination
+composer update foskym/flarum-pagination:"*"
+php flarum migrate
 php flarum cache:clear
 ```
 
-## Dezinstalare
+## Links
 
-Pentru dezinstalarea extensiei trebuie executată următoarea comandă Composer:
-
-```sh
-composer remove block-cat/pagination
-php flarum cache:clear
-```
-
-## Link-uri utile
-
-- [Cod sursă pe GitHub](https://github.com/block-cat/pagination)
-- [Changelog](CHANGELOG.md)
+- [Packagist](https://packagist.org/packages/FoskyM/flarum-pagination)
+- [GitHub](https://github.com/FoskyM/flarum-pagination)
+- [Discuss](https://discuss.flarum.org/d/PUT_DISCUSS_SLUG_HERE)
