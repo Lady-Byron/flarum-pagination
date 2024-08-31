@@ -1,6 +1,6 @@
 {
-    "name": "nodeloc/pagination",
-    "description": "Add pagination for DiscussionList(DL) in your flarum. (Forked from block-cat/pagination.)",
+    "name": "foskym/flarum-pagination",
+    "description": "A flarum pagination extension.",
     "keywords": [
         "flarum",
         "extension",
@@ -10,12 +10,19 @@
     "license": "MIT",
     "authors": [
         {
+            "name": "FoskyM",
+            "homepage": "https://fosky.top",
+            "email": "i@fosky.top",
+            "role": "maintainer"
+        },
+        {
             "name": "Nodeloc",
             "homepage": "https://github.com/nodeloc"
         },
         {
-            "name": "nodeloc",
-            "homepage": "https://github.com/nodeloc"
+            "name": "lrysia",
+            "homepage": "https://github.com/lrysia",
+            "role": "developer"
         },
         {
             "name": "BlockCat",
@@ -24,15 +31,15 @@
         }
     ],
     "support": {
-        "issues": "https://github.com/nodeloc/flarum-pagination/issues",
-        "source": "https://github.com/nodeloc/flarum-pagination"
+        "issues": "https://github.com/FoskyM/flarum-pagination/issues",
+        "source": "https://github.com/FoskyM/flarum-pagination"
     },
     "require": {
         "flarum/core": "^1.2"
     },
     "extra": {
         "flarum-extension": {
-            "title": "DL Pagination",
+            "title": "Pagination",
             "icon": {
                 "name": "fas fa-book",
                 "backgroundColor": "#146EBE",
@@ -42,12 +49,7 @@
     },
     "autoload": {
         "psr-4": {
-              "nodeloc\\Pagination\\": "src/"
-        },
-        "files": [
-              "src/Overrides/Api/Controller/AbstractSerializeController.php",
-              "src/Overrides/Filter/AbstractFilterer.php",
-              "src/Overrides/Search/AbstractSearcher.php"
-        ]
+            "FoskyM\\Pagination\\": "src/"
+        }
     }
 }

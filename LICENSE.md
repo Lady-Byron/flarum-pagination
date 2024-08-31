@@ -1,6 +1,7 @@
 The MIT License (MIT)
 
 Copyright © 2021 Iulian Cernei (block-cat)
+Copyright © 2024 FoskyM
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the “Software”), to deal

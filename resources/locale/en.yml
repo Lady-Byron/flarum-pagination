@@ -1,22 +1,22 @@
-Nodeloc-DLP:
+foskym-pagination:
   admin:
     settings:
       pagination:
-        CanUserPref: Allow users to set the loading mode of DiscussionList
-        PaginationFirst: Enable pagination mode
-        PaginationFirst-Help:   'Pagination mode will be applied to both forum home page and user personal page'
-        NavBarPosition: Select position of pagination navigation bar
-        PerPage: "Pagination Mode: Capacity of DiscussionList per page (1-50)"
-        PerLoadMore: 'LoadMore Mode: The amount of discussions per LoadMore (1-50)'
-        PerIndexInit: 'LoadMore Mode: The amount of discussions in first page (1-50)'
-        Position:
-          Above: Above
-          Under: Under
-          Both: Both
+        canUserPref: Allow users to set the loading mode of DiscussionList
+        paginationOnLoading: Enable pagination mode
+        paginationOnLoading-Help:   'Pagination mode will be applied to both forum home page and user personal page'
+        paginationPosition: Select position of pagination navigation bar
+        perPage: "Pagination Mode: Capacity of DiscussionList per page (1-50)"
+        perLoadMore: 'LoadMore Mode: The amount of discussions per LoadMore (1-50)'
+        perIndexInit: 'LoadMore Mode: The amount of discussions in first page (1-50)'
+        position:
+          above: Above
+          under: Under
+          both: Both
 
   forum:
     user:
       settings:
-        Head: DiscussionList - Loading Mode
-        DLP_UserCustom: Enable personalization (When closed, load by forum preset mode)
-        DLP_UserPaginationFirst: Enable pagination mode
+        head: DiscussionList - Loading Mode
+        userCustom: Enable personalization (When closed, load by forum preset mode)
+        userPaginationOnLoading: Enable pagination mode
