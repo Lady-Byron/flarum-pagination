@@ -61,8 +61,6 @@ export default function () {
       this.lastRquestParams = reqParams;
     }
 
-    // need to fix
-/*
     const preloadedDiscussions = app.preloadedApiDocument();
     if (preloadedDiscussions) {
       this.initialLoading = false;
@@ -72,7 +70,6 @@ export default function () {
 
       return Promise.resolve(preloadedDiscussions);
     }
-*/
 
     if (!this.isRefreshing && this.options.cacheDiscussions) {
       if (

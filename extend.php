@@ -59,4 +59,6 @@ return [
     (new Extend\SimpleFlarumSearch(DiscussionSearcher::class))
         ->addSearchMutator(Search\Search::class),
 
+    (new Extend\Middleware('api'))
+        ->add(Middleware\PaginationMiddleware::class)
 ];
