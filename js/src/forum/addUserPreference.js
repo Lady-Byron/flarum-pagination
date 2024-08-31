@@ -8,8 +8,8 @@ import Stream from 'flarum/common/utils/Stream';
 
 export default function () {
   extend(SettingsPage.prototype, 'oninit', function () {
-    const user = this.user as any;
-    const preferences = user.preferences() as any;
+    const user = this.user;
+    const preferences = user.preferences();
     this.userCustom = Stream(preferences['foskym-pagination.userCustom']);
     this.userPaginationOnLoading = Stream(preferences['foskym-pagination.userPaginationOnLoading']);
   });

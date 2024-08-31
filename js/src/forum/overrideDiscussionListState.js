@@ -59,6 +59,17 @@ export default function () {
     if (!this.lastRquestParams['include']) {
       this.lastRquestParams = reqParams;
     }
+
+    const preloadedDiscussions = app.preloadedApiDocument();
+    if (preloadedDiscussions) {
+      this.initialLoading = false;
+      this.isRefreshing = false;
+      this.totalDiscussionCount = Stream(preloadedDiscussions.payload.jsonapi.totalResultsCount);
+      this.lastTotalDiscussionCount = this.totalDiscussionCount();
+
+      return Promise.resolve(preloadedDiscussions);
+    }
+
     if (!this.isRefreshing) {
       if (
         JSON.stringify(reqParams['include']) !== JSON.stringify(this.lastRquestParams['include']) ||
@@ -141,13 +152,10 @@ export default function () {
       this.lastLoadedPage = {};
     } else {
       // no need to update the discussion list
-      this.page = Stream(page);
       this.lastLoadedPage[pageNum] = page;
       let start = this.options.perPage * (pageNum - 1);
       let end = this.options.perPage * pageNum;
       this.lastDiscussions.splice(start, end - start, ...results);
-      m.redraw();
-      return;
     }
 
     this.getTotalPages = function () {
@@ -224,11 +232,48 @@ export default function () {
     m.redraw();
   });
 
-  override(DiscussionListState.prototype, 'addDiscussion', function (original) {
-    // if (!this.usePaginationMode) {
-    //   return original();
-    // }
-    // this.totalDiscussionCount(this.totalDiscussionCount() + 1);
-    // this.totalPages(this.getTotalPages());
+  override(DiscussionListState.prototype, 'addDiscussion', function (original, discussion) {
+    if (!this.usePaginationMode) {
+      return original();
+    }
+    const index = this.lastDiscussions.indexOf(discussion);
+
+    if (index !== -1) {
+      this.lastDiscussions.splice(index);
+      this.lastDiscussions.unshift(discussion);
+    } else {
+      this.lastDiscussions.unshift(discussion);
+      this.lastTotalDiscussionCount++;
+      this.totalDiscussionCount(this.lastTotalDiscussionCount);
+    }
+
+    m.redraw();
+  });
+
+  override(DiscussionListState.prototype, 'deleteDiscussion', function (original, discussion) {
+    if (!this.usePaginationMode) {
+      return original();
+    }
+    const index = this.lastDiscussions.indexOf(discussion);
+
+    if (index !== -1) {
+      this.lastDiscussions.splice(index);
+      this.lastTotalDiscussionCount--;
+      this.totalDiscussionCount(this.lastTotalDiscussionCount);
+    }
+
+    m.redraw();
+  });
+
+  override(DiscussionListState.prototype, 'clear', function (original) {
+    if (!this.usePaginationMode) {
+      return original();
+    }
+    this.lastDiscussions = [];
+    this.lastLoadedPage = {};
+    this.lastRquestParams = {};
+    this.lastTotalDiscussionCount = 0;
+    this.lastTotalPages = 0;
+    return original();
   });
 }
