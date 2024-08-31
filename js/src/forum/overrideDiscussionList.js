@@ -49,14 +49,13 @@ export default function () {
       }
     }
 
-    const controls = Toolbar.component({ state });
     const position = app.forum.attribute('foskym-pagination.paginationPosition');
     const pageSize = state.options.perPage;
     const pageNum = state.page;
 
     return (
       <div className={classList('DiscussionList', { 'DiscussionList--searchResults': state.isSearchResults() })}>
-        {position == 'above' || position == 'both' ? controls : ''}
+        {position == 'above' || position == 'both' ? Toolbar.component({ state }) : ''}
         <ul role="feed" aria-busy={isLoading} className="DiscussionList-discussions">
           {items.map((discussion, itemNum) => (
             <li key={discussion.id()} data-id={discussion.id()} role="article" aria-setsize="-1" aria-posinset={pageNum * pageSize + itemNum}>
@@ -64,7 +63,7 @@ export default function () {
             </li>
           ))}
         </ul>
-        {position == 'under' || position == 'both' ? controls : ''}
+        {position == 'under' || position == 'both' ? Toolbar.component({ state }) : ''}
       </div>
     );
   });
