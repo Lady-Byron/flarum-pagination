@@ -8,14 +8,17 @@ import Button from 'flarum/common/components/Button';
 import Stream from 'flarum/common/utils/Stream';
 import DiscussionComposer from 'flarum/forum/components/DiscussionComposer';
 import DiscussionControls from 'flarum/forum/utils/DiscussionControls';
+import LoadingIndicator from 'flarum/common/components/LoadingIndicator';
+import classList from 'flarum/common/utils/classList';
 
 import addUserPreference from './addUserPreference';
 import determineMode from './determineMode';
+import Toolbar from './components/Toolbar';
 
 app.initializers.add('foskym/flarum-pagination', () => {
   addUserPreference();
 
-  override(DiscussionListState.prototype, 'refresh', function (original, page = 1) {
+  DiscussionListState.prototype.initOptions = function () {
     this.options = {
       perPage: app.forum.attribute('foskym-pagination.perPage'),
       perLoadMore: app.forum.attribute('foskym-pagination.perLoadMore'),
@@ -25,6 +28,10 @@ app.initializers.add('foskym/flarum-pagination', () => {
     };
 
     this.usePaginationMode = determineMode();
+  };
+
+  override(DiscussionListState.prototype, 'refresh', function (original, page = 1) {
+    this.initOptions();
 
     if (!this.usePaginationMode) {
       this.pageSize = this.options.perLoadMore;
@@ -44,7 +51,9 @@ app.initializers.add('foskym/flarum-pagination', () => {
         this.pages = [];
         this.parseResults(this.location.page, results);
       })
-      .finally(() => (this.initialLoading = false));
+      .finally(() => {
+        this.initialLoading = false;
+      });
   });
 
   override(DiscussionListState.prototype, 'loadPage', function (original, page = 1) {
@@ -106,7 +115,7 @@ app.initializers.add('foskym/flarum-pagination', () => {
     this.location = { page: pageNum };
 
     this.totalDiscussionCount = Stream(results.payload.jsonapi.totalResultsCount);
-    
+
     this.getTotalPages = function () {
       return Math.ceil(this.totalDiscussionCount() / this.options.perPage);
     };
@@ -126,7 +135,11 @@ app.initializers.add('foskym/flarum-pagination', () => {
 
         this.page(current);
         let next = current;
-        this.loadPage(next).then(this.parseResults.bind(this, next));
+        this.loadingPrev = true;
+        this.loadPage(next).then((results) => {
+          this.parseResults(next, results);
+          this.loadingPrev = false;
+        });
       }.bind(this),
 
       nextPage: function () {
@@ -140,7 +153,11 @@ app.initializers.add('foskym/flarum-pagination', () => {
 
         this.page(current);
         let next = current;
-        this.loadPage(next).then(this.parseResults.bind(this, next));
+        this.loadingNext = true;
+        this.loadPage(next).then((results) => {
+          this.parseResults(next, results);
+          this.loadingNext = false;
+        });
       }.bind(this),
 
       toPage: function (page) {
@@ -149,7 +166,12 @@ app.initializers.add('foskym/flarum-pagination', () => {
         this.page(Number(page));
         let next = Number(page);
 
-        this.loadPage(next).then(this.parseResults.bind(this, next)); //.then(this.preLoadNextDiscussionPage(next + 1));
+        this.initialLoading = true;
+
+        this.loadPage(next).then((results) => {
+          this.parseResults(next, results);
+          this.initialLoading = false;
+        });
       }.bind(this),
 
       pageList: function () {
@@ -168,165 +190,73 @@ app.initializers.add('foskym/flarum-pagination', () => {
     m.redraw();
   });
 
-  extend(DiscussionList.prototype, 'view', function (view) {
+  override(DiscussionListState.prototype, 'addDiscussion', function (original) {
+    // if (!this.usePaginationMode) {
+    //   return original();
+    // }
+    // this.totalDiscussionCount(this.totalDiscussionCount() + 1);
+    // this.totalPages(this.getTotalPages());
+  });
+
+  override(DiscussionList.prototype, 'view', function (original) {
     const state = this.attrs.state;
 
     if (!state.usePaginationMode) {
-      return;
+      return original();
     }
 
     const params = state.getParams();
-
-    let DiscussionListView;
+    const isLoading = state.isLoading();
 
     if (state.isEmpty()) {
       const text = app.translator.trans('core.forum.discussion_list.empty_text');
-      DiscussionListView = Placeholder.component({ text });
-      view.children = [];
-      view.children.push(DiscussionListView);
-      return;
+      return (
+        <div className="DiscussionList">
+          <Placeholder text={text} />
+        </div>
+      );
     }
 
-    if (!state.isLoading()) {
-      let dicussionsOnPage = [];
-      const pages = state.getPages();
-
-      for (let index = 0; index < pages.length; index++) {
-        const page = pages[index];
-        if (page.number == state.location.page) {
-          page.items.map((discussion) => {
-            dicussionsOnPage.push(
-              <li key={discussion.id()} data-id={discussion.id()}>
-                {DiscussionListItem.component({ discussion, params })}
-              </li>
-            );
-          });
-          break;
-        }
-      }
-
-      DiscussionListView = <ul className="DiscussionList-discussions">{dicussionsOnPage.map((i) => i)}</ul>;
-
-      view.children = [];
-      view.children.push(DiscussionListView);
-
-      let buttonFirst = Button.component({
-        title: 'First',
-        icon: 'fa fa-angle-double-left',
-        className: 'Button Button--icon',
-        onclick: () => {
-          state.ctrl.toPage(1);
-        },
-      });
-      let buttonBack = Button.component({
-        title: 'Back',
-        icon: 'fa fa-angle-left',
-        className: 'Button Button--icon',
-        onclick: () => {
-          let page = state.page().number;
-          state.ctrl.toPage(parseInt(page) - 1);
-        },
-      });
-      let buttonNext = Button.component({
-        title: 'Next',
-        icon: 'fa fa-angle-right',
-        className: 'Button Button--icon',
-        onclick: () => {
-          let page = state.page().number;
-          state.ctrl.toPage(parseInt(page) + 1);
-        },
-      });
-      let buttonLast = Button.component({
-        title: 'Last',
-        icon: 'fa fa-angle-double-right',
-        className: 'Button Button--icon',
-        onclick: () => {
-          let page = parseInt(state.totalPages());
-          state.ctrl.toPage(parseInt(page));
-        },
-      });
-
-      function JumpFunc() {
-        let input = parseInt(document.getElementById('pagination-inputJump').value);
-        if (Number.isFinite(input) && Number.isSafeInteger(input)) {
-          if (input != state.page().number) {
-            if (1 <= input && input <= state.totalPages()) {
-              state.ctrl.toPage(input);
-            }
-          }
-        }
-      }
-      let inputJump = m('input.FromControl', {
-        id: 'pagination-inputJump',
-        placeholder: state.page().number === undefined ? '' : `${state.page().number}`,
-        onkeydown: (event) => {
-          event.redraw = false;
-          if (event.keyCode == 13) {
-            event.redraw = true;
-            JumpFunc();
-          }
-        },
-      });
-      let buttonJump = Button.component({
-        title: 'Jump',
-        icon: 'fas fa-paper-plane',
-        className: 'Button Button--icon',
-        onclick: JumpFunc,
-      });
-
-      let buttonPage = [];
-      let buttons;
-      let toolbar;
-
-      state.ctrl.pageList().map(function (page) {
-        let me = this;
-        buttonPage.push(
-          Button.component(
-            {
-              title: parseInt(page),
-              icon: '',
-              className: page == me.page().number ? 'Button Button--primary' : 'Button',
-              'data-page': page,
-              onclick:
-                page != me.page().number
-                  ? () => {
-                      me.ctrl.toPage(parseInt(page));
-                    }
-                  : '',
-            },
-            m('strong', { className: '' }, parseInt(page))
-          )
-        );
-      }, state);
-
-      buttons = [buttonFirst].concat(buttonBack, buttonPage, buttonNext, buttonLast, inputJump, buttonJump);
-
-      toolbar = {
-        view: function (vnode) {
-          return m(
-            'div',
-            { id: 'toolbar' + Math.floor(Math.random() * 10 + 1), className: 'Pagination' },
-            m(
-              'ul',
-              { class: 'IndexPage-toolbar-view' },
-              vnode.attrs.groupbuttons.map((ibutton) => {
-                return m('li', { class: '' }, ibutton);
-              })
-            )
-          );
-        },
-      };
-
-      app.forum.attribute('foskym-pagination.paginationPosition') == 'above' && !state.isLoading()
-        ? view.children.unshift(m(toolbar, { groupbuttons: buttons }))
-        : '';
-      app.forum.attribute('foskym-pagination.paginationPosition') == 'under' && !state.isLoading()
-        ? view.children.push(m(toolbar, { groupbuttons: buttons }))
-        : '';
-      app.forum.attribute('foskym-pagination.paginationPosition') == 'both' && !state.isLoading()
-        ? view.children.unshift(m(toolbar, { groupbuttons: buttons })) && view.children.push(m(toolbar, { groupbuttons: buttons }))
-        : '';
+    if (isLoading) {
+      return (
+        <div className={classList('DiscussionList', { 'DiscussionList--searchResults': state.isSearchResults() })}>
+          <ul role="feed" aria-busy={isLoading} className="DiscussionList-discussions"></ul>
+          <div className="DiscussionList-loadMore">
+            <LoadingIndicator />
+          </div>
+        </div>
+      );
     }
+
+    const pages = state.getPages();
+    let items = [];
+
+    for (let index = 0; index < pages.length; index++) {
+      const page = pages[index];
+      if (page.number == state.location.page) {
+        items = page.items;
+        break;
+      }
+    }
+
+    const controls = Toolbar.component({ state });
+    const position = app.forum.attribute('foskym-pagination.paginationPosition');
+    const pageSize = state.options.perPage;
+    const pageNum = state.page;
+
+    return (
+      <div className={classList('DiscussionList', { 'DiscussionList--searchResults': state.isSearchResults() })}>
+        {position == 'above' || position == 'both' ? controls : ''}
+        <ul role="feed" aria-busy={isLoading} className="DiscussionList-discussions">
+          {items.map((discussion, itemNum) => (
+            <li key={discussion.id()} data-id={discussion.id()} role="article" aria-setsize="-1" aria-posinset={pageNum * pageSize + itemNum}>
+              <DiscussionListItem discussion={discussion} params={params} />
+            </li>
+          ))}
+        </ul>
+        {position == 'under' || position == 'both' ? controls : ''}
+      </div>
+    );
   });
 
   extend(DiscussionControls, 'deleteAction', function () {
