@@ -60,7 +60,7 @@ export default function () {
     if (!this.lastRquestParams['include']) {
       this.lastRquestParams = reqParams;
     }
-
+    
     const preloadedDiscussions = app.preloadedApiDocument();
     if (preloadedDiscussions) {
       this.initialLoading = false;
@@ -74,8 +74,8 @@ export default function () {
     if (!this.isRefreshing && this.options.cacheDiscussions) {
       if (
         JSON.stringify(reqParams['include']) !== JSON.stringify(this.lastRquestParams['include']) ||
-        reqParams['filter.q'] === this.lastRquestParams['filter.q'] ||
-        reqParams['sort'] === this.lastRquestParams['sort']
+        JSON.stringify(reqParams['filter']) !== JSON.stringify(this.lastRquestParams['filter.q']) ||
+        reqParams['sort'] !== this.lastRquestParams['sort']
       ) {
         if (this.lastLoadedPage[page]) {
           let start = this.options.perPage * (page - 1);
