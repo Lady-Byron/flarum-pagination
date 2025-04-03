@@ -20,13 +20,13 @@ export default function () {
     this.lastTotalPages = 0;
     this.lastDiscussions = [];
     this.lastLoadedPage = {};
-    this.lastRquestParams = {};
+    this.lastRequestParams = {};
 
-    this.optionInited = true;
+    this.optionInitialized = true;
   };
 
   override(DiscussionListState.prototype, 'refresh', function (original, page = 1) {
-    if (!this.optionInited) this.initOptions();
+    if (!this.optionInitialized) this.initOptions();
 
     if (!this.usePaginationMode) {
       this.pageSize = this.options.perLoadMore;
@@ -56,9 +56,9 @@ export default function () {
 
   override(DiscussionListState.prototype, 'loadPage', function (original, page = 1) {
     const reqParams = this.requestParams();
-    if (!this.optionInited) this.initOptions();
-    if (!this.lastRquestParams['include']) {
-      this.lastRquestParams = reqParams;
+    if (!this.optionInitialized) this.initOptions();
+    if (!this.lastRequestParams['include']) {
+      this.lastRequestParams = reqParams;
     }
 
     const preloadedDiscussions = app.preloadedApiDocument();
@@ -73,9 +73,9 @@ export default function () {
 
     if (!this.isRefreshing && this.options.cacheDiscussions) {
       if (
-        JSON.stringify(reqParams['include']) !== JSON.stringify(this.lastRquestParams['include']) ||
-        JSON.stringify(reqParams['filter']) !== JSON.stringify(this.lastRquestParams['filter.q']) ||
-        reqParams['sort'] !== this.lastRquestParams['sort']
+        JSON.stringify(reqParams['include']) !== JSON.stringify(this.lastRequestParams['include']) ||
+        JSON.stringify(reqParams['filter']) !== JSON.stringify(this.lastRequestParams['filter.q']) ||
+        reqParams['sort'] !== this.lastRequestParams['sort']
       ) {
         if (this.lastLoadedPage[page]) {
           let start = this.options.perPage * (page - 1);
@@ -308,7 +308,7 @@ export default function () {
     }
     this.lastDiscussions = [];
     this.lastLoadedPage = {};
-    this.lastRquestParams = {};
+    this.lastRequestParams = {};
     this.lastTotalDiscussionCount = 0;
     this.lastTotalPages = 0;
     this.totalDiscussionCount = Stream(0);
