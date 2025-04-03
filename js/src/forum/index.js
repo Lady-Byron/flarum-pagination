@@ -35,4 +35,4 @@ app.initializers.add('foskym/flarum-pagination', () => {
       app.discussions.refresh();
     }
   });
-});
+}, -2); // load later to deal with `walsgit-discussion-cards`
