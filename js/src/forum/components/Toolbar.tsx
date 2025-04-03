@@ -39,7 +39,7 @@ export default class Toolbar extends Component {
     let state = this.attrs.state;
     return Button.component({
       title: 'First',
-      icon: 'fa fa-angle-double-left',
+      icon: 'fa fa-angle-double-left fas fa-angles-left',
       className: 'Button Button--icon',
       onclick: () => {
         state.ctrl.toPage(1);
@@ -52,7 +52,7 @@ export default class Toolbar extends Component {
     let state = this.attrs.state;
     return Button.component({
       title: 'Back',
-      icon: 'fa fa-angle-left',
+      icon: 'fa fa-angle-left fas',
       className: 'Button Button--icon',
       onclick: () => {
         let page = state.page().number;
@@ -66,7 +66,7 @@ export default class Toolbar extends Component {
     let state = this.attrs.state;
     return Button.component({
       title: 'Next',
-      icon: 'fa fa-angle-right',
+      icon: 'fa fa-angle-right fas',
       className: 'Button Button--icon',
       onclick: () => {
         let page = state.page().number;
@@ -80,7 +80,7 @@ export default class Toolbar extends Component {
     let state = this.attrs.state;
     return Button.component({
       title: 'Last',
-      icon: 'fa fa-angle-double-right',
+      icon: 'fa fa-angle-double-right fas fa-angles-right',
       className: 'Button Button--icon',
       onclick: () => {
         let page = parseInt(state.totalPages());
@@ -120,7 +120,7 @@ export default class Toolbar extends Component {
   buttonJump() {
     return Button.component({
       title: 'Jump',
-      icon: 'fa fa-paper-plane',
+      icon: 'fa fa-paper-plane fas',
       className: 'Button Button--icon',
       onclick: this.JumpFunc.bind(this),
     });
