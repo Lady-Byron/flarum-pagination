@@ -204,6 +204,23 @@ export default function () {
     this.totalPages = Stream(this.getTotalPages());
 
     this.ctrl = {
+      scrollToTop: function () {
+        // only IndexPage
+        const container = document.querySelector('#content > .IndexPage > .container');
+        const header = document.querySelector('#header')
+        let offsetY = 0;
+        if (header) {
+          offsetY = header.clientHeight;
+        }
+        if (container) {
+          const targetPosition = container.getBoundingClientRect().top + window.scrollY - offsetY;
+
+          // scroll after redraw completely
+          setTimeout(() => {
+            window.scrollTo({ top: targetPosition, behavior: 'smooth' });
+          }, 50);
+        }
+      },
       prevPage: function () {
         let current = this.page().number;
         --current;
@@ -218,6 +235,8 @@ export default function () {
         this.loadPage(next).then((results) => {
           this.parseResults(next, results);
           this.loadingPrev = false;
+
+          this.ctrl.scrollToTop();
         });
       }.bind(this),
 
@@ -236,6 +255,8 @@ export default function () {
         this.loadPage(next).then((results) => {
           this.parseResults(next, results);
           this.loadingNext = false;
+
+          this.ctrl.scrollToTop();
         });
       }.bind(this),
 
@@ -250,6 +271,8 @@ export default function () {
         this.loadPage(next).then((results) => {
           this.parseResults(next, results);
           this.initialLoading = false;
+
+          this.ctrl.scrollToTop();
         });
       }.bind(this),
 
