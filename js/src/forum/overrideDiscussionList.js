@@ -53,16 +53,28 @@ export default function () {
     const pageSize = state.options.perPage;
     const pageNum = state.page;
 
+    let discussionList = (
+      <ul role="feed" aria-busy={isLoading} className="DiscussionList-discussions">
+        {items.map((discussion, itemNum) => (
+          <li key={discussion.id()} data-id={discussion.id()} role="article" aria-setsize="-1" aria-posinset={pageNum * pageSize + itemNum}>
+            <DiscussionListItem discussion={discussion} params={params} />
+          </li>
+        ))}
+      </ul>
+    );
+
+    // for `walsgit-discussion-cards`, is there any better solution?
+    const cardSupport = 'walsgit-discussion-cards' in flarum.extensions;
+    if (cardSupport) {
+      const tree = original();
+      if (tree.children.length >= 2) tree.children = tree.children.slice(0, 1);
+      discussionList = tree;
+    }
+
     return (
       <div className={classList('DiscussionList', { 'DiscussionList--searchResults': state.isSearchResults() })}>
         {position == 'above' || position == 'both' ? Toolbar.component({ state }) : ''}
-        <ul role="feed" aria-busy={isLoading} className="DiscussionList-discussions">
-          {items.map((discussion, itemNum) => (
-            <li key={discussion.id()} data-id={discussion.id()} role="article" aria-setsize="-1" aria-posinset={pageNum * pageSize + itemNum}>
-              <DiscussionListItem discussion={discussion} params={params} />
-            </li>
-          ))}
-        </ul>
+          {discussionList}
         {position == 'under' || position == 'both' ? Toolbar.component({ state }) : ''}
       </div>
     );

@@ -20,13 +20,13 @@ export default function () {
     this.lastTotalPages = 0;
     this.lastDiscussions = [];
     this.lastLoadedPage = {};
-    this.lastRquestParams = {};
+    this.lastRequestParams = {};
 
-    this.optionInited = true;
+    this.optionInitialized = true;
   };
 
   override(DiscussionListState.prototype, 'refresh', function (original, page = 1) {
-    if (!this.optionInited) this.initOptions();
+    if (!this.optionInitialized) this.initOptions();
 
     if (!this.usePaginationMode) {
       this.pageSize = this.options.perLoadMore;
@@ -56,11 +56,11 @@ export default function () {
 
   override(DiscussionListState.prototype, 'loadPage', function (original, page = 1) {
     const reqParams = this.requestParams();
-    if (!this.optionInited) this.initOptions();
-    if (!this.lastRquestParams['include']) {
-      this.lastRquestParams = reqParams;
+    if (!this.optionInitialized) this.initOptions();
+    if (!this.lastRequestParams['include']) {
+      this.lastRequestParams = reqParams;
     }
-    
+
     const preloadedDiscussions = app.preloadedApiDocument();
     if (preloadedDiscussions) {
       this.initialLoading = false;
@@ -73,15 +73,22 @@ export default function () {
 
     if (!this.isRefreshing && this.options.cacheDiscussions) {
       if (
-        JSON.stringify(reqParams['include']) !== JSON.stringify(this.lastRquestParams['include']) ||
-        JSON.stringify(reqParams['filter']) !== JSON.stringify(this.lastRquestParams['filter.q']) ||
-        reqParams['sort'] !== this.lastRquestParams['sort']
+        JSON.stringify(reqParams['include']) !== JSON.stringify(this.lastRequestParams['include']) ||
+        JSON.stringify(reqParams['filter']) !== JSON.stringify(this.lastRequestParams['filter.q']) ||
+        reqParams['sort'] !== this.lastRequestParams['sort']
       ) {
         if (this.lastLoadedPage[page]) {
           let start = this.options.perPage * (page - 1);
           let end = this.options.perPage * page;
           let results = this.lastDiscussions.slice(start, end);
           results.payload = { jsonapi: { totalResultsCount: this.totalDiscussionCount() } };
+
+          // for `walsgit/flarum-discussion-cards`
+          // if resolve at first, the card items would not redraw at `cache mode`.
+          this.initialLoading = true;
+          m.redraw();
+          return new Promise((resolve) => setTimeout(() => resolve(results), 50));
+
           return Promise.resolve(results);
         }
       }
@@ -112,6 +119,27 @@ export default function () {
     return app.store.find(this.type, params);
   });
 
+
+  // for `walsgit-discussion-cards`, might cause other extensions error?
+  override(DiscussionListState.prototype, 'getAllItems', function(original) {
+    if (!'walsgit-discussion-cards' in flarum.extensions) return original();
+
+    return this.extraDiscussions.concat(
+      this.getPages(true)
+        .map((pg) => pg.items)
+        .flat()
+    );
+  })
+
+  // for `walsgit-discussion-cards`, might cause other extensions error?
+  override(DiscussionListState.prototype, 'getPages', function(original, getAllPages = false) {
+    const allPages = original();
+    if (!'walsgit-discussion-cards' in flarum.extensions) return allPages;
+
+    if (getAllPages) return allPages;
+    return [allPages.find((page) => page.number === this.location.page)]
+  })
+
   override(DiscussionListState.prototype, 'parseResults', function (original, pg, results) {
     if (!this.usePaginationMode) {
       return original(pg, results);
@@ -128,7 +156,7 @@ export default function () {
     };
 
     this.hasPage = function (page) {
-      let allPages = this.getPages();
+      let allPages = this.getPages(true);
       if (allPages.length == 0) return false;
       for (let i = 0; i < allPages.length; i++) {
         if (allPages[i].number == page) return true;
@@ -139,6 +167,8 @@ export default function () {
     if (!this.hasPage(pageNum)) {
       this.pages.push(page);
     }
+
+    this.pages = this.pages.sort((a, b) => a.number - b.number)
 
     this.location = { page: pageNum };
 
@@ -278,7 +308,7 @@ export default function () {
     }
     this.lastDiscussions = [];
     this.lastLoadedPage = {};
-    this.lastRquestParams = {};
+    this.lastRequestParams = {};
     this.lastTotalDiscussionCount = 0;
     this.lastTotalPages = 0;
     this.totalDiscussionCount = Stream(0);
