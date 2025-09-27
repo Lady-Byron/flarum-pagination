@@ -2,15 +2,14 @@ import app from 'flarum/common/app';
 import { override } from 'flarum/common/extend';
 import DiscussionListState from 'flarum/forum/states/DiscussionListState';
 import Stream from 'flarum/common/utils/Stream';
-
 import determineMode from './utils/determineMode';
 
 /**
- * 最小修补：
- * - 修正 `!'ext' in obj` 的括号优先级（两处）
+ * 最小修补要点：
+ * - 修正 "!'ext' in obj" 括号优先级（两处）
  * - 修正 filter 对比键名（filter vs filter.q）
- * - 清理不可达 return
- * - 在分页模式下把 refreshParams → refresh() 串起来，确保 Realtime 的“黄条触发”能刷新当前页
+ * - 移除不可达 return
+ * - 将 refreshParams → refresh() 串起来，确保 Realtime 黄条触发能刷新分页
  */
 export default function () {
   // 初始化分页选项
@@ -32,7 +31,7 @@ export default function () {
     this.optionInitialized = true;
   };
 
-  // 关键：把 refreshParams 串到 refresh，确保 Realtime 触发能刷新分页
+  // 关键：把参数刷新串到 refresh，保证分页模式下能正确更新
   override(DiscussionListState.prototype, 'refreshParams', function (original, params, page = this.location?.page ?? 1) {
     const ret = original(params, page);
     if (this.usePaginationMode && typeof this.refresh === 'function') {
@@ -41,7 +40,7 @@ export default function () {
     return ret;
   });
 
-  // 刷新当前页
+  // 刷新指定页
   override(DiscussionListState.prototype, 'refresh', function (original, page = 1) {
     if (!this.optionInitialized) this.initOptions();
 
@@ -69,7 +68,7 @@ export default function () {
       });
   });
 
-  // 加载指定页
+  // 加载某页
   override(DiscussionListState.prototype, 'loadPage', function (original, page = 1) {
     const reqParams = this.requestParams();
     if (!this.optionInitialized) this.initOptions();
@@ -88,12 +87,10 @@ export default function () {
       return Promise.resolve(preloadedDiscussions);
     }
 
-    // 本地缓存复用
+    // 本地缓存复用（请求参数未变化时）
     if (!this.isRefreshing && this.options.cacheDiscussions) {
-      const includeChanged =
-        JSON.stringify(reqParams['include']) !== JSON.stringify(this.lastRequestParams['include']);
-      const filterChanged =
-        JSON.stringify(reqParams['filter']) !== JSON.stringify(this.lastRequestParams['filter']);
+      const includeChanged = JSON.stringify(reqParams['include']) !== JSON.stringify(this.lastRequestParams['include']);
+      const filterChanged = JSON.stringify(reqParams['filter']) !== JSON.stringify(this.lastRequestParams['filter']);
       const sortChanged = reqParams['sort'] !== this.lastRequestParams['sort'];
 
       if (!(includeChanged || filterChanged || sortChanged)) {
@@ -136,14 +133,13 @@ export default function () {
     return app.store.find(this.type, params);
   });
 
-  // 兼容 walsgit-discussion-cards：把“拿所有 item/页”的语义纠正
+  // cards 兼容：拿所有 items
   override(DiscussionListState.prototype, 'getAllItems', function (original) {
     if (!('walsgit-discussion-cards' in flarum.extensions)) return original();
-    return this.extraDiscussions.concat(
-      this.getPages(true).map((pg) => pg.items).flat()
-    );
+    return this.extraDiscussions.concat(this.getPages(true).map((pg) => pg.items).flat());
   });
 
+  // cards 兼容：仅返回当前页（或所有页）
   override(DiscussionListState.prototype, 'getPages', function (original, getAllPages = false) {
     const allPages = original();
     if (!('walsgit-discussion-cards' in flarum.extensions)) return allPages;
@@ -153,12 +149,10 @@ export default function () {
 
   // 解析结果并更新分页状态
   override(DiscussionListState.prototype, 'parseResults', function (original, pg, results) {
-    if (!this.usePaginationMode) {
-      return original(pg, results);
-    }
+    if (!this.usePaginationMode) return original(pg, results);
+
     const pageNum = Number(pg);
     const links = results.payload?.links || {};
-
     const page = {
       number: pageNum,
       items: results,
@@ -215,8 +209,8 @@ export default function () {
         let offsetY = 0;
         if (header) offsetY = header.clientHeight;
         if (container) {
-          const targetPosition = container.getBoundingClientRect().top + window.scrollY - offsetY;
-          setTimeout(() => window.scrollTo({ top: targetPosition, behavior: 'smooth' }), 50);
+          const target = container.getBoundingClientRect().top + window.scrollY - offsetY;
+          setTimeout(() => window.scrollTo({ top: target, behavior: 'smooth' }), 50);
         }
       }.bind(this),
 
