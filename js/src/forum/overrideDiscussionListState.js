@@ -5,7 +5,15 @@ import Stream from 'flarum/common/utils/Stream';
 
 import determineMode from './utils/determineMode';
 
+/**
+ * 最小修补：
+ * - 修正 `!'ext' in obj` 的括号优先级（两处）
+ * - 修正 filter 对比键名（filter vs filter.q）
+ * - 清理不可达 return
+ * - 在分页模式下把 refreshParams → refresh() 串起来，确保 Realtime 的“黄条触发”能刷新当前页
+ */
 export default function () {
+  // 初始化分页选项
   DiscussionListState.prototype.initOptions = function () {
     this.options = {
       cacheDiscussions: app.forum.attribute('foskym-pagination.cacheDiscussions'),
@@ -21,10 +29,19 @@ export default function () {
     this.lastDiscussions = [];
     this.lastLoadedPage = {};
     this.lastRequestParams = {};
-
     this.optionInitialized = true;
   };
 
+  // 关键：把 refreshParams 串到 refresh，确保 Realtime 触发能刷新分页
+  override(DiscussionListState.prototype, 'refreshParams', function (original, params, page = this.location?.page ?? 1) {
+    const ret = original(params, page);
+    if (this.usePaginationMode && typeof this.refresh === 'function') {
+      return Promise.resolve(ret).then(() => this.refresh(page));
+    }
+    return ret;
+  });
+
+  // 刷新当前页
   override(DiscussionListState.prototype, 'refresh', function (original, page = 1) {
     if (!this.optionInitialized) this.initOptions();
 
@@ -36,11 +53,9 @@ export default function () {
     this.initialLoading = true;
     this.loadingPrev = false;
     this.loadingNext = false;
-
     this.isRefreshing = true;
 
     this.clear();
-
     this.location = { page };
 
     return this.loadPage(page)
@@ -54,56 +69,58 @@ export default function () {
       });
   });
 
+  // 加载指定页
   override(DiscussionListState.prototype, 'loadPage', function (original, page = 1) {
     const reqParams = this.requestParams();
     if (!this.optionInitialized) this.initOptions();
+
     if (!this.lastRequestParams['include']) {
       this.lastRequestParams = reqParams;
     }
 
+    // 首屏预载
     const preloadedDiscussions = app.preloadedApiDocument();
     if (preloadedDiscussions) {
       this.initialLoading = false;
       this.isRefreshing = false;
       this.totalDiscussionCount = Stream(preloadedDiscussions.payload.jsonapi.totalResultsCount);
       this.lastTotalDiscussionCount = this.totalDiscussionCount();
-
       return Promise.resolve(preloadedDiscussions);
     }
 
+    // 本地缓存复用
     if (!this.isRefreshing && this.options.cacheDiscussions) {
-      if (
-        JSON.stringify(reqParams['include']) !== JSON.stringify(this.lastRequestParams['include']) ||
-        JSON.stringify(reqParams['filter']) !== JSON.stringify(this.lastRequestParams['filter.q']) ||
-        reqParams['sort'] !== this.lastRequestParams['sort']
-      ) {
+      const includeChanged =
+        JSON.stringify(reqParams['include']) !== JSON.stringify(this.lastRequestParams['include']);
+      const filterChanged =
+        JSON.stringify(reqParams['filter']) !== JSON.stringify(this.lastRequestParams['filter']);
+      const sortChanged = reqParams['sort'] !== this.lastRequestParams['sort'];
+
+      if (!(includeChanged || filterChanged || sortChanged)) {
         if (this.lastLoadedPage[page]) {
-          let start = this.options.perPage * (page - 1);
-          let end = this.options.perPage * page;
-          let results = this.lastDiscussions.slice(start, end);
+          const start = this.options.perPage * (page - 1);
+          const end = this.options.perPage * page;
+          const results = this.lastDiscussions.slice(start, end);
           results.payload = { jsonapi: { totalResultsCount: this.totalDiscussionCount() } };
 
-          // for `walsgit/flarum-discussion-cards`
-          // if resolve at first, the card items would not redraw at `cache mode`.
+          // 让卡片视图在 cache 模式下也能正确重绘
           this.initialLoading = true;
           m.redraw();
           return new Promise((resolve) => setTimeout(() => resolve(results), 50));
-
-          return Promise.resolve(results);
         }
       }
     }
 
+    // 计算 offset/limit
     const include = Array.isArray(reqParams.include) ? reqParams.include.join(',') : reqParams.include;
 
     let newOffset, newLimit;
-
     if (this.usePaginationMode) {
       newOffset = this.options.perPage * (page - 1);
       newLimit = this.options.perPage;
     } else {
       newOffset = this.options.perIndexInit * Math.min(page - 1, 1) + this.options.perLoadMore * Math.max(page - 2, 0);
-      newLimit = newOffset == 0 ? this.options.perIndexInit : this.options.perLoadMore;
+      newLimit = newOffset === 0 ? this.options.perIndexInit : this.options.perLoadMore;
     }
 
     const params = {
@@ -119,33 +136,27 @@ export default function () {
     return app.store.find(this.type, params);
   });
 
-
-  // for `walsgit-discussion-cards`, might cause other extensions error?
-  override(DiscussionListState.prototype, 'getAllItems', function(original) {
-    if (!'walsgit-discussion-cards' in flarum.extensions) return original();
-
+  // 兼容 walsgit-discussion-cards：把“拿所有 item/页”的语义纠正
+  override(DiscussionListState.prototype, 'getAllItems', function (original) {
+    if (!('walsgit-discussion-cards' in flarum.extensions)) return original();
     return this.extraDiscussions.concat(
-      this.getPages(true)
-        .map((pg) => pg.items)
-        .flat()
+      this.getPages(true).map((pg) => pg.items).flat()
     );
-  })
+  });
 
-  // for `walsgit-discussion-cards`, might cause other extensions error?
-  override(DiscussionListState.prototype, 'getPages', function(original, getAllPages = false) {
+  override(DiscussionListState.prototype, 'getPages', function (original, getAllPages = false) {
     const allPages = original();
-    if (!'walsgit-discussion-cards' in flarum.extensions) return allPages;
-
+    if (!('walsgit-discussion-cards' in flarum.extensions)) return allPages;
     if (getAllPages) return allPages;
-    return [allPages.find((page) => page.number === this.location.page)]
-  })
+    return [allPages.find((page) => page.number === this.location.page)];
+  });
 
+  // 解析结果并更新分页状态
   override(DiscussionListState.prototype, 'parseResults', function (original, pg, results) {
     if (!this.usePaginationMode) {
       return original(pg, results);
     }
     const pageNum = Number(pg);
-
     const links = results.payload?.links || {};
 
     const page = {
@@ -155,42 +166,36 @@ export default function () {
       hasPrev: !!links?.prev,
     };
 
-    this.hasPage = function (page) {
-      let allPages = this.getPages(true);
-      if (allPages.length == 0) return false;
-      for (let i = 0; i < allPages.length; i++) {
-        if (allPages[i].number == page) return true;
-      }
-      return false;
+    this.hasPage = function (num) {
+      const all = this.getPages(true);
+      if (all.length === 0) return false;
+      return all.some((p) => p.number === num);
     };
 
     if (!this.hasPage(pageNum)) {
       this.pages.push(page);
     }
 
-    this.pages = this.pages.sort((a, b) => a.number - b.number)
-
+    this.pages = this.pages.sort((a, b) => a.number - b.number);
     this.location = { page: pageNum };
 
     this.totalDiscussionCount = Stream(results.payload.jsonapi.totalResultsCount);
 
     if (this.options.cacheDiscussions) {
       if (
-        (this.lastTotalDiscussionCount != this.totalDiscussionCount() && this.lastTotalDiscussionCount != 0) ||
+        (this.lastTotalDiscussionCount !== this.totalDiscussionCount() && this.lastTotalDiscussionCount !== 0) ||
         this.lastTotalDiscussionCount === 0 ||
         this.isRefreshing
       ) {
-        // need to update the discussion list
+        // 重置缓存
         this.lastTotalDiscussionCount = this.totalDiscussionCount();
-        for (let i = 0; i < this.lastTotalDiscussionCount; i++) {
-          this.lastDiscussions[i] = {};
-        }
+        this.lastDiscussions = new Array(this.lastTotalDiscussionCount);
         this.lastLoadedPage = {};
       } else {
-        // no need to update the discussion list
+        // 继续累积缓存
         this.lastLoadedPage[pageNum] = page;
-        let start = this.options.perPage * (pageNum - 1);
-        let end = this.options.perPage * pageNum;
+        const start = this.options.perPage * (pageNum - 1);
+        const end = this.options.perPage * pageNum;
         this.lastDiscussions.splice(start, end - start, ...results);
       }
     }
@@ -205,86 +210,60 @@ export default function () {
 
     this.ctrl = {
       scrollToTop: function () {
-        // only IndexPage
         const container = document.querySelector('#content > .IndexPage > .container');
-        const header = document.querySelector('#header')
+        const header = document.querySelector('#header');
         let offsetY = 0;
-        if (header) {
-          offsetY = header.clientHeight;
-        }
+        if (header) offsetY = header.clientHeight;
         if (container) {
           const targetPosition = container.getBoundingClientRect().top + window.scrollY - offsetY;
-
-          // scroll after redraw completely
-          setTimeout(() => {
-            window.scrollTo({ top: targetPosition, behavior: 'smooth' });
-          }, 50);
+          setTimeout(() => window.scrollTo({ top: targetPosition, behavior: 'smooth' }), 50);
         }
-      },
+      }.bind(this),
+
       prevPage: function () {
-        let current = this.page().number;
-        --current;
-
-        if (current < 1) {
-          return;
-        }
-
+        let current = this.page().number - 1;
+        if (current < 1) return;
         this.page(current);
-        let next = current;
         this.loadingPrev = true;
-        this.loadPage(next).then((results) => {
-          this.parseResults(next, results);
+        this.loadPage(current).then((r) => {
+          this.parseResults(current, r);
           this.loadingPrev = false;
-
           this.ctrl.scrollToTop();
         });
       }.bind(this),
 
       nextPage: function () {
-        let current = this.page().number;
-        ++current;
-
+        let current = this.page().number + 1;
         if (current > this.totalPages()) {
           current = this.totalPages();
           return;
         }
-
         this.page(current);
-        let next = current;
         this.loadingNext = true;
-        this.loadPage(next).then((results) => {
-          this.parseResults(next, results);
+        this.loadPage(current).then((r) => {
+          this.parseResults(current, r);
           this.loadingNext = false;
-
           this.ctrl.scrollToTop();
         });
       }.bind(this),
 
       toPage: function (page) {
-        if (this.page().number == Number(page) || page < 1 || page > this.totalPages()) return;
-
-        this.page(Number(page));
-        let next = Number(page);
-
+        const target = Number(page);
+        if (this.page().number === target || target < 1 || target > this.totalPages()) return;
+        this.page(target);
         this.initialLoading = true;
-
-        this.loadPage(next).then((results) => {
-          this.parseResults(next, results);
+        this.loadPage(target).then((r) => {
+          this.parseResults(target, r);
           this.initialLoading = false;
-
           this.ctrl.scrollToTop();
         });
       }.bind(this),
 
       pageList: function () {
-        let p = [],
-          left = Math.max(parseInt(this.page().number) - this.options.leftEdges, 1),
-          right = Math.min(parseInt(this.page().number) + this.options.rightEdges, this.totalPages());
-
-        for (let i = left; i <= right; i++) {
-          p.push(i);
-        }
-
+        const p = [];
+        const left = Math.max(parseInt(this.page().number) - this.options.leftEdges, 1);
+        const right = Math.min(parseInt(this.page().number) + this.options.rightEdges, this.totalPages());
+        for (let i = left; i <= right; i++) p.push(i);
         return p;
       }.bind(this),
     };
@@ -292,12 +271,10 @@ export default function () {
     m.redraw();
   });
 
+  // 新增/删除讨论的本地同步（分页模式）
   override(DiscussionListState.prototype, 'addDiscussion', function (original, discussion) {
-    if (!this.usePaginationMode) {
-      return original();
-    }
+    if (!this.usePaginationMode) return original();
     const index = this.lastDiscussions.indexOf(discussion);
-
     if (index !== -1) {
       this.lastDiscussions.splice(index);
       this.lastDiscussions.unshift(discussion);
@@ -306,29 +283,23 @@ export default function () {
       this.lastTotalDiscussionCount++;
       this.totalDiscussionCount(this.lastTotalDiscussionCount);
     }
-
     m.redraw();
   });
 
   override(DiscussionListState.prototype, 'deleteDiscussion', function (original, discussion) {
-    if (!this.usePaginationMode) {
-      return original();
-    }
+    if (!this.usePaginationMode) return original();
     const index = this.lastDiscussions.indexOf(discussion);
-
     if (index !== -1) {
       this.lastDiscussions.splice(index);
       this.lastTotalDiscussionCount--;
       this.totalDiscussionCount(this.lastTotalDiscussionCount);
     }
-
     m.redraw();
   });
 
+  // 清理状态
   override(DiscussionListState.prototype, 'clear', function (original) {
-    if (!this.usePaginationMode) {
-      return original();
-    }
+    if (!this.usePaginationMode) return original();
     this.lastDiscussions = [];
     this.lastLoadedPage = {};
     this.lastRequestParams = {};
