@@ -4,13 +4,6 @@ import DiscussionListState from 'flarum/forum/states/DiscussionListState';
 import Stream from 'flarum/common/utils/Stream';
 import determineMode from './utils/determineMode';
 
-/**
- * 最小修补要点：
- * - 修正 "!'ext' in obj" 括号优先级（两处）
- * - 修正 filter 对比键名（filter vs filter.q）
- * - 移除不可达 return
- * - 将 refreshParams → refresh() 串起来，确保 Realtime 黄条触发能刷新分页
- */
 export default function () {
   // 初始化分页选项
   DiscussionListState.prototype.initOptions = function () {
@@ -31,11 +24,13 @@ export default function () {
     this.optionInitialized = true;
   };
 
-  // 关键：把参数刷新串到 refresh，保证分页模式下能正确更新
-  override(DiscussionListState.prototype, 'refreshParams', function (original, params, page = this.location?.page ?? 1) {
+  // 把参数刷新串到 refresh，确保黄条触发能刷新分页
+  override(DiscussionListState.prototype, 'refreshParams', function (original, params, page = 1) {
     const ret = original(params, page);
     if (this.usePaginationMode && typeof this.refresh === 'function') {
-      return Promise.resolve(ret).then(() => this.refresh(page));
+      // 对于“最新”排序，直接回到第 1 页更符合直觉
+      const goPage = 1;
+      return Promise.resolve(ret).then(() => this.refresh(goPage));
     }
     return ret;
   });
@@ -77,7 +72,6 @@ export default function () {
       this.lastRequestParams = reqParams;
     }
 
-    // 首屏预载
     const preloadedDiscussions = app.preloadedApiDocument();
     if (preloadedDiscussions) {
       this.initialLoading = false;
@@ -87,7 +81,7 @@ export default function () {
       return Promise.resolve(preloadedDiscussions);
     }
 
-    // 本地缓存复用（请求参数未变化时）
+    // 本地缓存复用（参数未变）
     if (!this.isRefreshing && this.options.cacheDiscussions) {
       const includeChanged = JSON.stringify(reqParams['include']) !== JSON.stringify(this.lastRequestParams['include']);
       const filterChanged = JSON.stringify(reqParams['filter']) !== JSON.stringify(this.lastRequestParams['filter']);
@@ -100,7 +94,6 @@ export default function () {
           const results = this.lastDiscussions.slice(start, end);
           results.payload = { jsonapi: { totalResultsCount: this.totalDiscussionCount() } };
 
-          // 让卡片视图在 cache 模式下也能正确重绘
           this.initialLoading = true;
           m.redraw();
           return new Promise((resolve) => setTimeout(() => resolve(results), 50));
@@ -108,7 +101,6 @@ export default function () {
       }
     }
 
-    // 计算 offset/limit
     const include = Array.isArray(reqParams.include) ? reqParams.include.join(',') : reqParams.include;
 
     let newOffset, newLimit;
@@ -265,9 +257,21 @@ export default function () {
     m.redraw();
   });
 
-  // 新增/删除讨论的本地同步（分页模式）
+  // ☆ 关键修复：Realtime 释放新内容时调用 addDiscussion。
+  //   在分页模式下，直接触发一次 refresh(1)（轻微去抖），
+  //   确保第 1 页立即取回新数据并显示。
   override(DiscussionListState.prototype, 'addDiscussion', function (original, discussion) {
-    if (!this.usePaginationMode) return original();
+    if (!this.usePaginationMode) return original(discussion);
+
+    clearTimeout(this.__rtRefreshTimer);
+    this.__rtRefreshTimer = setTimeout(() => {
+      // 如果已经在第 1 页，也刷新第 1 页；否则跳转并刷新第 1 页
+      this.page = this.page || Stream({ number: 1, items: [] });
+      this.location = { page: 1 };
+      this.refresh(1);
+    }, 50);
+
+    // 仍然维护本地计数，避免统计突变
     const index = this.lastDiscussions.indexOf(discussion);
     if (index !== -1) {
       this.lastDiscussions.splice(index);
@@ -281,7 +285,7 @@ export default function () {
   });
 
   override(DiscussionListState.prototype, 'deleteDiscussion', function (original, discussion) {
-    if (!this.usePaginationMode) return original();
+    if (!this.usePaginationMode) return original(discussion);
     const index = this.lastDiscussions.indexOf(discussion);
     if (index !== -1) {
       this.lastDiscussions.splice(index);
@@ -303,3 +307,4 @@ export default function () {
     return original();
   });
 }
+
