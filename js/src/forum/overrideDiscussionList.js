@@ -6,18 +6,17 @@ import classList from 'flarum/common/utils/classList';
 import Toolbar from './components/Toolbar';
 
 /**
- * 最小修补要点：
- * - 不“换根”，基于 original() 返回的树做“定点替换” UL，避免 VDOM 生命周期错位
- * - 未加载/空列表时完全交回 original()，避免结构抖动
- * - 仅在非 cards 模式下替换 UL；cards 模式保留原渲染，只追加工具条
- * - 保留其它扩展（含 Realtime）对 view 的挂钩
+ * 稳定版：
+ * - 不“换根”、不更换原 <ul> 节点；只原位替换 children（Realtime 安全）
+ * - 同时匹配 className/class，避免漏匹配导致 push 出第二个 <ul>
+ * - 找不到原 <ul> 时才追加；末尾做一次去重护栏（只保留第一个）
  */
 export default function () {
   override(DiscussionList.prototype, 'view', function (original) {
     const state = this.attrs.state;
     if (!state?.usePaginationMode) return original();
 
-    // 加载中/空列表：不介入，交还给原实现（避免换根/Fragment）
+    // 加载中/空列表：完全不介入，交回原实现（避免结构抖动）
     if (state.isLoading() || state.isEmpty()) return original();
 
     const params = state.getParams();
@@ -35,24 +34,20 @@ export default function () {
       }
     }
 
-    // 构造替换用的 <ul>
-    const listVNode = (
-      <ul role="feed" aria-busy={false} className="DiscussionList-discussions">
-        {items.map((discussion, itemNum) => (
-          <li
-            key={discussion.id()}
-            data-id={discussion.id()}
-            role="article"
-            aria-setsize={-1}
-            aria-posinset={pageNum * pageSize + itemNum}
-          >
-            <DiscussionListItem discussion={discussion} params={params} />
-          </li>
-        ))}
-      </ul>
-    );
+    // 仅生成 li（不包 ul）
+    const liChildren = items.map((discussion, itemNum) => (
+      <li
+        key={discussion.id()}
+        data-id={discussion.id()}
+        role="article"
+        aria-setsize={-1}
+        aria-posinset={pageNum * pageSize + itemNum}
+      >
+        <DiscussionListItem discussion={discussion} params={params} />
+      </li>
+    ));
 
-    // 原始树（保持根/attrs/钩子不变）
+    // 原始树
     const tree = original();
     tree.attrs = tree.attrs || {};
     tree.attrs.className = classList(
@@ -64,20 +59,45 @@ export default function () {
     const kids = Array.isArray(tree.children) ? tree.children.slice() : [];
     const cardSupport = 'walsgit-discussion-cards' in flarum.extensions;
 
+    const getClass = (attrs) => String((attrs && (attrs.className || attrs.class)) || '');
+    const isUlList = (n) => n && n.tag === 'ul' && getClass(n.attrs).includes('DiscussionList-discussions');
+
     if (!cardSupport) {
-      // 非 cards：查找并替换 UL；找不到则追加（不清空 children）
+      // 1) 原位替换：找到第一个目标 <ul>，只更新其 children（不改 attrs、不换节点）
       let replaced = false;
       for (let i = 0; i < kids.length; i++) {
-        const c = kids[i];
-        if (c && c.tag === 'ul' && c.attrs && String(c.attrs.className || '').includes('DiscussionList-discussions')) {
-          kids[i] = listVNode;
+        const node = kids[i];
+        if (isUlList(node)) {
+          node.children = liChildren;   // 仅替换 children —— Realtime 兼容关键
+          kids[i] = node;
           replaced = true;
           break;
         }
       }
-      if (!replaced) kids.push(listVNode);
+
+      // 2) 完全找不到才追加一个新的 <ul>（理论上不应走到这里）
+      if (!replaced) {
+        kids.push(
+          <ul role="feed" className="DiscussionList-discussions">
+            {liChildren}
+          </ul>
+        );
+      }
+
+      // 3) 去重护栏：若存在多个 <ul>，只保留第一个（或第一个有 <li> 的）
+      let kept = false;
+      for (let i = kids.length - 1; i >= 0; i--) {
+        const node = kids[i];
+        if (isUlList(node)) {
+          if (!kept) {
+            kept = true; // 保留最前的一个
+            continue;
+          }
+          kids.splice(i, 1); // 移除其余的空壳/重复列表
+        }
+      }
     }
-    // cards 模式：保留原列表渲染，避免双重结构
+    // cards 模式：保留原列表渲染，仅追加工具条
 
     // 在上/下插入分页工具条
     if (position === 'above' || position === 'both') kids.unshift(Toolbar.component({ state }));
