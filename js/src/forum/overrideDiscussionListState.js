@@ -14,13 +14,25 @@ function getPageFromURL() {
     return null;
   }
 }
+
+/**
+ * 将当前页写入地址栏，并 **同步 Mithril 路由当前项**（replace，不新增历史）。
+ * 这样 Flarum 左上角的回退按钮（基于内部路由栈）与浏览器回退保持一致。
+ */
 function setPageToURL(n, replace = true) {
   try {
     const u = new URL(window.location.href);
     if (n <= 1) u.searchParams.delete('page'); // 第 1 页保持干净
     else u.searchParams.set('page', String(n));
     const newUrl = u.pathname + u.search + u.hash;
-    (replace ? history.replaceState : history.pushState).call(history, null, '', newUrl);
+
+    const mAny = (window && window.m) || null;
+    if (mAny && mAny.route && typeof mAny.route.set === 'function') {
+      // 同步当前路由记录（不新增历史栈条目）
+      mAny.route.set(newUrl, undefined, { replace: true });
+    } else {
+      (replace ? history.replaceState : history.pushState).call(history, null, '', newUrl);
+    }
   } catch {}
 }
 
@@ -64,7 +76,7 @@ export default function () {
       return original(page);
     }
 
-    // [URL-Persist] 仅当外部未显式指定页（或仍是默认 1）时，读取 URL 的 ?page
+    // 若外部未指定或为 1，则尝试使用 URL 上的 ?page
     let targetPage = page;
     if (targetPage === undefined || targetPage === 1) {
       const u = getPageFromURL();
@@ -79,7 +91,7 @@ export default function () {
     this.clear();
     this.location = { page: targetPage };
 
-    // [URL-Persist] 把当前页写回 URL（不新增历史记录）
+    // 同步 URL（不新增历史记录，同时同步 Mithril 当前路由项）
     setPageToURL(targetPage, true);
 
     return this.loadPage(targetPage)
@@ -244,7 +256,7 @@ export default function () {
         this.loadPage(current).then((r) => {
           this.parseResults(current, r);
           this.loadingPrev = false;
-          setPageToURL(current, true); // [URL-Persist]
+          setPageToURL(current, true); // 同步 URL & 内部路由
           this.ctrl.scrollToTop();
         });
       }.bind(this),
@@ -260,7 +272,7 @@ export default function () {
         this.loadPage(current).then((r) => {
           this.parseResults(current, r);
           this.loadingNext = false;
-          setPageToURL(current, true) // [URL-Persist]
+          setPageToURL(current, true); // 同步 URL & 内部路由
           this.ctrl.scrollToTop();
         });
       }.bind(this),
@@ -273,7 +285,7 @@ export default function () {
         this.loadPage(target).then((r) => {
           this.parseResults(target, r);
           this.initialLoading = false;
-          setPageToURL(target, true); // [URL-Persist]
+          setPageToURL(target, true); // 同步 URL & 内部路由
           this.ctrl.scrollToTop();
         });
       }.bind(this),
