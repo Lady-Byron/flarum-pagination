@@ -61,7 +61,7 @@ export default function () {
     return ret;
   });
 
-  // 刷新指定页（含：回退时用缓存直出，避免请求）
+  // 刷新指定页（含：回退时用缓存直出，避免请求 + 静默恢复首帧不闪 Loading）
   override(DiscussionListState.prototype, 'refresh', function (original, page = 1) {
     if (!this.optionInitialized) this.initOptions();
 
@@ -88,6 +88,9 @@ export default function () {
       !(includeChanged || filterChanged || sortChanged) &&
       this.lastLoadedPage[targetPage]
     ) {
+      // ★ 一次性静默恢复：首帧不渲染 LoadingIndicator
+      this.silentRestoreOnce = true;
+
       this.initialLoading = false;
       this.loadingPrev = false;
       this.loadingNext = false;
@@ -103,6 +106,11 @@ export default function () {
 
       this.pages = [];
       this.parseResults(this.location.page, results);
+
+      // 立即同步重绘，确保这一帧没有 Loading 的闪烁
+      m.redraw.sync();
+      // 复位标记（仅本次有效）
+      setTimeout(() => (this.silentRestoreOnce = false), 0);
 
       return Promise.resolve(results); // 不发请求，直接结束
     }
