@@ -4,7 +4,7 @@ import DiscussionListState from 'flarum/forum/states/DiscussionListState';
 import Stream from 'flarum/common/utils/Stream';
 import determineMode from './utils/determineMode';
 
-// [URL-Persist] --- URL 持久化工具（仅对列表页加/读 ?page=） ---
+// --- URL 持久化工具 ---
 function getPageFromURL() {
   try {
     const p = new URL(window.location.href).searchParams.get('page');
@@ -14,21 +14,16 @@ function getPageFromURL() {
     return null;
   }
 }
-
-/**
- * 将当前页写入地址栏，并 **同步 Mithril 路由当前项**（replace，不新增历史）。
- * 这样 Flarum 左上角的回退按钮（基于内部路由栈）与浏览器回退保持一致。
- */
+/** 将页码写到地址栏，并同步 Mithril 的当前路由项（replace，不新增历史） */
 function setPageToURL(n, replace = true) {
   try {
     const u = new URL(window.location.href);
-    if (n <= 1) u.searchParams.delete('page'); // 第 1 页保持干净
+    if (n <= 1) u.searchParams.delete('page');
     else u.searchParams.set('page', String(n));
     const newUrl = u.pathname + u.search + u.hash;
 
     const mAny = (window && window.m) || null;
     if (mAny && mAny.route && typeof mAny.route.set === 'function') {
-      // 同步当前路由记录（不新增历史栈条目）
       mAny.route.set(newUrl, undefined, { replace: true });
     } else {
       (replace ? history.replaceState : history.pushState).call(history, null, '', newUrl);
@@ -56,18 +51,17 @@ export default function () {
     this.optionInitialized = true;
   };
 
-  // 把参数刷新串到 refresh，确保黄条触发能刷新分页
+  // 参数刷新 -> 回到第 1 页（保持原行为）
   override(DiscussionListState.prototype, 'refreshParams', function (original, params, page = 1) {
     const ret = original(params, page);
     if (this.usePaginationMode && typeof this.refresh === 'function') {
-      // 保持原逻辑：最新排序时回到第 1 页
       const goPage = 1;
       return Promise.resolve(ret).then(() => this.refresh(goPage));
     }
     return ret;
   });
 
-  // 刷新指定页
+  // 刷新指定页（含：回退时用缓存直出，避免请求）
   override(DiscussionListState.prototype, 'refresh', function (original, page = 1) {
     if (!this.optionInitialized) this.initOptions();
 
@@ -76,12 +70,43 @@ export default function () {
       return original(page);
     }
 
-    // 若外部未指定或为 1，则尝试使用 URL 上的 ?page
+    // 若未显式传或为 1，优先读 URL 的 ?page
     let targetPage = page;
     if (targetPage === undefined || targetPage === 1) {
       const u = getPageFromURL();
       if (u) targetPage = u;
     }
+
+    // ===== 新增：缓存复用，不触发请求（仅在参数未变且缓存过该页时） =====
+    const reqParams = this.requestParams();
+    const includeChanged = JSON.stringify(reqParams['include']) !== JSON.stringify(this.lastRequestParams['include']);
+    const filterChanged  = JSON.stringify(reqParams['filter'])  !== JSON.stringify(this.lastRequestParams['filter']);
+    const sortChanged    = reqParams['sort'] !== this.lastRequestParams['sort'];
+
+    if (
+      this.options.cacheDiscussions &&
+      !(includeChanged || filterChanged || sortChanged) &&
+      this.lastLoadedPage[targetPage]
+    ) {
+      this.initialLoading = false;
+      this.loadingPrev = false;
+      this.loadingNext = false;
+      this.isRefreshing = false;
+
+      this.location = { page: targetPage };
+      setPageToURL(targetPage, true);
+
+      const start = this.options.perPage * (targetPage - 1);
+      const end   = this.options.perPage * targetPage;
+      const results = this.lastDiscussions.slice(start, end);
+      results.payload = { jsonapi: { totalResultsCount: this.totalDiscussionCount() } };
+
+      this.pages = [];
+      this.parseResults(this.location.page, results);
+
+      return Promise.resolve(results); // 不发请求，直接结束
+    }
+    // ===== 新增分支结束 =====
 
     this.initialLoading = true;
     this.loadingPrev = false;
@@ -90,8 +115,6 @@ export default function () {
 
     this.clear();
     this.location = { page: targetPage };
-
-    // 同步 URL（不新增历史记录，同时同步 Mithril 当前路由项）
     setPageToURL(targetPage, true);
 
     return this.loadPage(targetPage)
@@ -126,8 +149,8 @@ export default function () {
     // 本地缓存复用（参数未变）
     if (!this.isRefreshing && this.options.cacheDiscussions) {
       const includeChanged = JSON.stringify(reqParams['include']) !== JSON.stringify(this.lastRequestParams['include']);
-      const filterChanged = JSON.stringify(reqParams['filter']) !== JSON.stringify(this.lastRequestParams['filter']);
-      const sortChanged = reqParams['sort'] !== this.lastRequestParams['sort'];
+      const filterChanged  = JSON.stringify(reqParams['filter'])  !== JSON.stringify(this.lastRequestParams['filter']);
+      const sortChanged    = reqParams['sort'] !== this.lastRequestParams['sort'];
 
       if (!(includeChanged || filterChanged || sortChanged)) {
         if (this.lastLoadedPage[page]) {
@@ -256,7 +279,7 @@ export default function () {
         this.loadPage(current).then((r) => {
           this.parseResults(current, r);
           this.loadingPrev = false;
-          setPageToURL(current, true); // 同步 URL & 内部路由
+          setPageToURL(current, true);
           this.ctrl.scrollToTop();
         });
       }.bind(this),
@@ -272,7 +295,7 @@ export default function () {
         this.loadPage(current).then((r) => {
           this.parseResults(current, r);
           this.loadingNext = false;
-          setPageToURL(current, true); // 同步 URL & 内部路由
+          setPageToURL(current, true);
           this.ctrl.scrollToTop();
         });
       }.bind(this),
@@ -285,7 +308,7 @@ export default function () {
         this.loadPage(target).then((r) => {
           this.parseResults(target, r);
           this.initialLoading = false;
-          setPageToURL(target, true); // 同步 URL & 内部路由
+          setPageToURL(target, true);
           this.ctrl.scrollToTop();
         });
       }.bind(this),
@@ -302,21 +325,17 @@ export default function () {
     m.redraw();
   });
 
-  // ☆ 关键修复：Realtime 释放新内容时调用 addDiscussion。
-  //   在分页模式下，直接触发一次 refresh(1)（轻微去抖），
-  //   确保第 1 页立即取回新数据并显示。
+  // Realtime 新内容：分页模式下刷新第 1 页（保持原修复）
   override(DiscussionListState.prototype, 'addDiscussion', function (original, discussion) {
     if (!this.usePaginationMode) return original(discussion);
 
     clearTimeout(this.__rtRefreshTimer);
     this.__rtRefreshTimer = setTimeout(() => {
-      // 如果已经在第 1 页，也刷新第 1 页；否则跳转并刷新第 1 页
       this.page = this.page || Stream({ number: 1, items: [] });
       this.location = { page: 1 };
       this.refresh(1);
     }, 50);
 
-    // 仍然维护本地计数，避免统计突变
     const index = this.lastDiscussions.indexOf(discussion);
     if (index !== -1) {
       this.lastDiscussions.splice(index);
