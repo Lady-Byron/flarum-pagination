@@ -35,8 +35,7 @@ function setPageToURL(n, replace = true) {
 function buildSessionKey(state, page) {
   try {
     const req = state.requestParams ? state.requestParams() : {};
-    const base = location.pathname; // 保留路由维度（首页/标签/书签等）
-    // 只挑会影响结果集的关键参数做 key
+    const base = location.pathname;
     const keyObj = {
       base,
       include: req.include || [],
@@ -61,12 +60,7 @@ function savePageCache(state, page, results) {
       (results && results.payload && results.payload.jsonapi && results.payload.jsonapi.totalResultsCount) ||
       0;
 
-    const record = {
-      ids,
-      total,
-      ts: Date.now(),
-      perPage: state.options?.perPage || 20,
-    };
+    const record = { ids, total, ts: Date.now(), perPage: state.options?.perPage || 20 };
     sessionStorage.setItem(key, JSON.stringify(record));
   } catch {}
 }
@@ -88,24 +82,17 @@ function tryRestoreFromSession(state, page) {
         (app.store.getById && app.store.getById(type, id)) ||
         (app.store.getBy && app.store.getBy(type, 'id', id)) ||
         null;
-      if (!model) {
-        // 若有任何 ID 缺失，放弃本次会话恢复，走原刷新逻辑
-        return null;
-      }
+      if (!model) return null; // 缺任一条则放弃会话恢复
       models.push(model);
     }
 
-    // 伪造一个与接口一致的 payload，以便 parseResults 计算 hasNext/hasPrev
     const totalPages = Math.ceil((rec.total || 0) / (rec.perPage || state.options?.perPage || 20));
     const links = {};
     if (page > 1) links.prev = true;
     if (page < totalPages) links.next = true;
 
     const results = models;
-    results.payload = {
-      jsonapi: { totalResultsCount: rec.total || 0 },
-      links,
-    };
+    results.payload = { jsonapi: { totalResultsCount: rec.total || 0 }, links };
     return results;
   } catch {
     return null;
@@ -158,12 +145,10 @@ export default function () {
       if (u) targetPage = u;
     }
 
-    // ===== 新增：会话缓存直出，不触发请求 =====
-    // 说明：lastLoadedPage 等内存缓存在离开 IndexPage 后会丢失，所以使用 sessionStorage 跨页恢复
+    // 会话缓存直出（不发请求）
     const sessionResults = tryRestoreFromSession(this, targetPage);
     if (sessionResults) {
-      // 一次性静默恢复：本帧不渲染 LoadingIndicator（配合 view 里去除 Loading）
-      this.silentRestoreOnce = true;
+      this.silentRestoreOnce = true; // 首帧去 Loading
 
       this.initialLoading = false;
       this.loadingPrev = false;
@@ -176,13 +161,12 @@ export default function () {
       this.pages = [];
       this.parseResults(this.location.page, sessionResults);
 
-      // 同步重绘，确保首帧无闪烁
-      m.redraw.sync();
-      setTimeout(() => (this.silentRestoreOnce = false), 0);
+      // ★ 修复点：用异步重绘，避免 Nested m.redraw.sync()
+      if (typeof m !== 'undefined' && m.redraw) m.redraw();
 
+      setTimeout(() => (this.silentRestoreOnce = false), 0);
       return Promise.resolve(sessionResults);
     }
-    // ===== 新增分支结束 =====
 
     this.initialLoading = true;
     this.loadingPrev = false;
@@ -335,7 +319,7 @@ export default function () {
     this.perPage = Stream(this.options.perPage);
     this.totalPages = Stream(this.getTotalPages());
 
-    // ★ 保存本页到会话缓存（供回退直出）
+    // 保存本页到会话缓存（供回退直出）
     savePageCache(this, pageNum, results);
 
     this.ctrl = {
