@@ -31,6 +31,87 @@ function setPageToURL(n, replace = true) {
   } catch {}
 }
 
+// --- 会话级页面缓存（跨页面回退可直出首帧） ---
+function buildSessionKey(state, page) {
+  try {
+    const req = state.requestParams ? state.requestParams() : {};
+    const base = location.pathname; // 保留路由维度（首页/标签/书签等）
+    // 只挑会影响结果集的关键参数做 key
+    const keyObj = {
+      base,
+      include: req.include || [],
+      filter: req.filter || {},
+      sort: req.sort || null,
+      perPage: state.options?.perPage || 20,
+      page: Number(page) || 1,
+    };
+    return 'lbtc:dl:pagecache:' + JSON.stringify(keyObj);
+  } catch {
+    return null;
+  }
+}
+
+function savePageCache(state, page, results) {
+  try {
+    const key = buildSessionKey(state, page);
+    if (!key) return;
+    const ids = Array.isArray(results) ? results.map((d) => d && d.id && d.id()) : [];
+    const total =
+      (state.totalDiscussionCount && state.totalDiscussionCount()) ||
+      (results && results.payload && results.payload.jsonapi && results.payload.jsonapi.totalResultsCount) ||
+      0;
+
+    const record = {
+      ids,
+      total,
+      ts: Date.now(),
+      perPage: state.options?.perPage || 20,
+    };
+    sessionStorage.setItem(key, JSON.stringify(record));
+  } catch {}
+}
+
+function tryRestoreFromSession(state, page) {
+  try {
+    const key = buildSessionKey(state, page);
+    if (!key) return null;
+    const raw = sessionStorage.getItem(key);
+    if (!raw) return null;
+
+    const rec = JSON.parse(raw);
+    if (!rec || !Array.isArray(rec.ids) || !rec.ids.length) return null;
+
+    const type = state.type || 'discussions';
+    const models = [];
+    for (const id of rec.ids) {
+      const model =
+        (app.store.getById && app.store.getById(type, id)) ||
+        (app.store.getBy && app.store.getBy(type, 'id', id)) ||
+        null;
+      if (!model) {
+        // 若有任何 ID 缺失，放弃本次会话恢复，走原刷新逻辑
+        return null;
+      }
+      models.push(model);
+    }
+
+    // 伪造一个与接口一致的 payload，以便 parseResults 计算 hasNext/hasPrev
+    const totalPages = Math.ceil((rec.total || 0) / (rec.perPage || state.options?.perPage || 20));
+    const links = {};
+    if (page > 1) links.prev = true;
+    if (page < totalPages) links.next = true;
+
+    const results = models;
+    results.payload = {
+      jsonapi: { totalResultsCount: rec.total || 0 },
+      links,
+    };
+    return results;
+  } catch {
+    return null;
+  }
+}
+
 export default function () {
   // 初始化分页选项
   DiscussionListState.prototype.initOptions = function () {
@@ -61,7 +142,7 @@ export default function () {
     return ret;
   });
 
-  // 刷新指定页（含：回退时用缓存直出，避免请求 + 静默恢复首帧不闪 Loading）
+  // 刷新指定页（含：会话缓存直出 + 静默首帧 + URL 同步）
   override(DiscussionListState.prototype, 'refresh', function (original, page = 1) {
     if (!this.optionInitialized) this.initOptions();
 
@@ -77,18 +158,11 @@ export default function () {
       if (u) targetPage = u;
     }
 
-    // ===== 新增：缓存复用，不触发请求（仅在参数未变且缓存过该页时） =====
-    const reqParams = this.requestParams();
-    const includeChanged = JSON.stringify(reqParams['include']) !== JSON.stringify(this.lastRequestParams['include']);
-    const filterChanged  = JSON.stringify(reqParams['filter'])  !== JSON.stringify(this.lastRequestParams['filter']);
-    const sortChanged    = reqParams['sort'] !== this.lastRequestParams['sort'];
-
-    if (
-      this.options.cacheDiscussions &&
-      !(includeChanged || filterChanged || sortChanged) &&
-      this.lastLoadedPage[targetPage]
-    ) {
-      // ★ 一次性静默恢复：首帧不渲染 LoadingIndicator
+    // ===== 新增：会话缓存直出，不触发请求 =====
+    // 说明：lastLoadedPage 等内存缓存在离开 IndexPage 后会丢失，所以使用 sessionStorage 跨页恢复
+    const sessionResults = tryRestoreFromSession(this, targetPage);
+    if (sessionResults) {
+      // 一次性静默恢复：本帧不渲染 LoadingIndicator（配合 view 里去除 Loading）
       this.silentRestoreOnce = true;
 
       this.initialLoading = false;
@@ -99,20 +173,14 @@ export default function () {
       this.location = { page: targetPage };
       setPageToURL(targetPage, true);
 
-      const start = this.options.perPage * (targetPage - 1);
-      const end   = this.options.perPage * targetPage;
-      const results = this.lastDiscussions.slice(start, end);
-      results.payload = { jsonapi: { totalResultsCount: this.totalDiscussionCount() } };
-
       this.pages = [];
-      this.parseResults(this.location.page, results);
+      this.parseResults(this.location.page, sessionResults);
 
-      // 立即同步重绘，确保这一帧没有 Loading 的闪烁
+      // 同步重绘，确保首帧无闪烁
       m.redraw.sync();
-      // 复位标记（仅本次有效）
       setTimeout(() => (this.silentRestoreOnce = false), 0);
 
-      return Promise.resolve(results); // 不发请求，直接结束
+      return Promise.resolve(sessionResults);
     }
     // ===== 新增分支结束 =====
 
@@ -212,7 +280,7 @@ export default function () {
     return [allPages.find((page) => page.number === this.location.page)];
   });
 
-  // 解析结果并更新分页状态
+  // 解析结果并更新分页状态（保存会话缓存）
   override(DiscussionListState.prototype, 'parseResults', function (original, pg, results) {
     if (!this.usePaginationMode) return original(pg, results);
 
@@ -266,6 +334,9 @@ export default function () {
     this.page = Stream(page);
     this.perPage = Stream(this.options.perPage);
     this.totalPages = Stream(this.getTotalPages());
+
+    // ★ 保存本页到会话缓存（供回退直出）
+    savePageCache(this, pageNum, results);
 
     this.ctrl = {
       scrollToTop: function () {
