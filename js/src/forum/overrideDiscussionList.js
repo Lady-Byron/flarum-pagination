@@ -13,6 +13,10 @@ import Toolbar from './components/Toolbar';
  * - 工具条 Toolbar 仅作为 UL 的兄弟节点插入（上/下），不改动 UL 本体。
  * - 在 cards 模式下完全不触碰 UL，只插 Toolbar。
  * - 未找到 UL 时不做任何 UL 追加（避免制造第二个 UL）。
+ *
+ * 额外增强（与方案A匹配）：
+ * - 若 state.silentRestoreOnce 为 true（回退命中缓存的首帧），移除该帧中的 LoadingIndicator，避免闪烁；
+ *   仅影响该帧视觉，不改变任何数据/逻辑，下一帧自动恢复原状。
  */
 export default function () {
   override(DiscussionList.prototype, 'view', function (original) {
@@ -26,6 +30,37 @@ export default function () {
       { 'DiscussionList--searchResults': state?.isSearchResults?.() },
       tree.attrs.className
     );
+
+    // --- [SilentRestore]：移除本帧 LoadingIndicator，避免“回退命中缓存”时的一闪 ---
+    if (state?.silentRestoreOnce) {
+      const getClass = (attrs) => String((attrs && (attrs.className || attrs.class)) || '');
+      const isLoadingIndicator = (n) => n && typeof n === 'object' && n.attrs && getClass(n.attrs).includes('LoadingIndicator');
+      const childrenRef = (nodeOrArr) => {
+        if (Array.isArray(nodeOrArr)) return nodeOrArr;
+        if (nodeOrArr && Array.isArray(nodeOrArr.children)) return nodeOrArr.children;
+        return null;
+      };
+      (function strip(node) {
+        if (!node) return;
+        if (Array.isArray(node)) {
+          for (let i = node.length - 1; i >= 0; i--) {
+            const child = node[i];
+            if (isLoadingIndicator(child)) node.splice(i, 1);
+            else strip(child);
+          }
+          return;
+        }
+        if (typeof node === 'string' || typeof node === 'number') return;
+        const ch = childrenRef(node);
+        if (!ch) return;
+        for (let i = ch.length - 1; i >= 0; i--) {
+          const c = ch[i];
+          if (isLoadingIndicator(c)) ch.splice(i, 1);
+          else strip(c);
+        }
+      })(tree);
+    }
+    // --- [SilentRestore] 结束 ---
 
     // 非分页模式、加载中或空列表：不干预 UL，直接返回
     if (!state?.usePaginationMode || state.isLoading?.() || state.isEmpty?.()) {
