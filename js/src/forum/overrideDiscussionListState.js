@@ -4,6 +4,26 @@ import DiscussionListState from 'flarum/forum/states/DiscussionListState';
 import Stream from 'flarum/common/utils/Stream';
 import determineMode from './utils/determineMode';
 
+// [URL-Persist] --- URL 持久化工具（仅对列表页加/读 ?page=） ---
+function getPageFromURL() {
+  try {
+    const p = new URL(window.location.href).searchParams.get('page');
+    const n = parseInt(p, 10);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  } catch {
+    return null;
+  }
+}
+function setPageToURL(n, replace = true) {
+  try {
+    const u = new URL(window.location.href);
+    if (n <= 1) u.searchParams.delete('page'); // 第 1 页保持干净
+    else u.searchParams.set('page', String(n));
+    const newUrl = u.pathname + u.search + u.hash;
+    (replace ? history.replaceState : history.pushState).call(history, null, '', newUrl);
+  } catch {}
+}
+
 export default function () {
   // 初始化分页选项
   DiscussionListState.prototype.initOptions = function () {
@@ -28,7 +48,7 @@ export default function () {
   override(DiscussionListState.prototype, 'refreshParams', function (original, params, page = 1) {
     const ret = original(params, page);
     if (this.usePaginationMode && typeof this.refresh === 'function') {
-      // 对于“最新”排序，直接回到第 1 页更符合直觉
+      // 保持原逻辑：最新排序时回到第 1 页
       const goPage = 1;
       return Promise.resolve(ret).then(() => this.refresh(goPage));
     }
@@ -44,15 +64,25 @@ export default function () {
       return original(page);
     }
 
+    // [URL-Persist] 仅当外部未显式指定页（或仍是默认 1）时，读取 URL 的 ?page
+    let targetPage = page;
+    if (targetPage === undefined || targetPage === 1) {
+      const u = getPageFromURL();
+      if (u) targetPage = u;
+    }
+
     this.initialLoading = true;
     this.loadingPrev = false;
     this.loadingNext = false;
     this.isRefreshing = true;
 
     this.clear();
-    this.location = { page };
+    this.location = { page: targetPage };
 
-    return this.loadPage(page)
+    // [URL-Persist] 把当前页写回 URL（不新增历史记录）
+    setPageToURL(targetPage, true);
+
+    return this.loadPage(targetPage)
       .then((results) => {
         this.pages = [];
         this.parseResults(this.location.page, results);
@@ -214,6 +244,7 @@ export default function () {
         this.loadPage(current).then((r) => {
           this.parseResults(current, r);
           this.loadingPrev = false;
+          setPageToURL(current, true); // [URL-Persist]
           this.ctrl.scrollToTop();
         });
       }.bind(this),
@@ -229,6 +260,7 @@ export default function () {
         this.loadPage(current).then((r) => {
           this.parseResults(current, r);
           this.loadingNext = false;
+          setPageToURL(current, true) // [URL-Persist]
           this.ctrl.scrollToTop();
         });
       }.bind(this),
@@ -241,6 +273,7 @@ export default function () {
         this.loadPage(target).then((r) => {
           this.parseResults(target, r);
           this.initialLoading = false;
+          setPageToURL(target, true); // [URL-Persist]
           this.ctrl.scrollToTop();
         });
       }.bind(this),
@@ -307,4 +340,3 @@ export default function () {
     return original();
   });
 }
-
