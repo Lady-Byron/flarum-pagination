@@ -6,22 +6,20 @@ import classList from 'flarum/common/utils/classList';
 import Toolbar from './components/Toolbar';
 
 /**
- * 修复要点：
- * - 不新建第二个 <ul.DiscussionList-discussions>；仅原位替换其 children。
- * - 清除其它空壳 UL。
- * - Toolbar 作为 UL 的兄弟节点插入（上/下）。
- * - cards 模式不触碰 UL，仅插 Toolbar。
- *
- * 额外增强：
- * - 若 state.silentRestoreOnce 为 true（回退命中会话缓存的首帧），
- *   递归剔除本帧中的 LoadingIndicator，避免“一闪而过”的加载圈。
+ * 要点：
+ * - 绝不新建第二个 <ul.DiscussionList-discussions>，只原位替换其 children。
+ * - 删除其它空壳 UL；Toolbar 作为兄弟节点插入（上/下）。
+ * - cards 模式不触碰 UL，只插 Toolbar。
+ * - 静默恢复：当 state.silentRestoreOnce 为真时，去掉本帧的 LoadingIndicator。
+ * - “不滚回”的视觉：state.__hideListOnce 为真时，本帧隐藏列表；
+ *   oncreate 同帧用锚点瞬移到目标帖子，再显示列表。
  */
 export default function () {
   override(DiscussionList.prototype, 'view', function (original) {
     const state = this.attrs?.state;
     const tree = original();
 
-    // 根类
+    // 根节点类
     tree.attrs = tree.attrs || {};
     tree.attrs.className = classList(
       'DiscussionList',
@@ -29,7 +27,7 @@ export default function () {
       tree.attrs.className
     );
 
-    // 静默恢复：去掉本帧 LoadingIndicator
+    // 静默恢复：移除本帧 LoadingIndicator
     if (state?.silentRestoreOnce) {
       const getClass = (attrs) => String((attrs && (attrs.className || attrs.class)) || '');
       const isLoadingIndicator = (n) => n && typeof n === 'object' && n.attrs && getClass(n.attrs).includes('LoadingIndicator');
@@ -57,6 +55,31 @@ export default function () {
           else strip(c);
         }
       })(tree);
+    }
+
+    // ★ 不滚回：首帧隐藏 + oncreate 瞬移锚点后再显示
+    if (state?.__hideListOnce) {
+      const oldStyle = tree.attrs.style || '';
+      tree.attrs.style = (oldStyle ? oldStyle + ';' : '') + 'visibility:hidden';
+
+      const prevOncreate = tree.attrs.oncreate;
+      tree.attrs.oncreate = function (vnode) {
+        if (typeof prevOncreate === 'function') prevOncreate.call(this, vnode);
+        try {
+          if (window.__dlRestoreFromAnchor && state.__pendingAnchor) {
+            const docEl = document.documentElement;
+            const prev = docEl.style.scrollBehavior;
+            docEl.style.scrollBehavior = 'auto'; // 关闭平滑滚动，确保无“滚动感”
+            window.__dlRestoreFromAnchor(state.__pendingAnchor);
+            docEl.style.scrollBehavior = prev || '';
+          }
+        } catch {}
+        // 清理一次性标记并恢复可见
+        state.__pendingAnchor = null;
+        state.__hideListOnce = false;
+        // 下一帧显示
+        if (typeof m !== 'undefined' && m.redraw) m.redraw();
+      };
     }
 
     // 非分页模式/加载中/空列表：不改 UL
@@ -184,4 +207,3 @@ export default function () {
     }
   });
 }
-
