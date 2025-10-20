@@ -6,20 +6,24 @@ import classList from 'flarum/common/utils/classList';
 import Toolbar from './components/Toolbar';
 
 /**
- * 要点：
- * - 绝不新建第二个 <ul.DiscussionList-discussions>，只原位替换其 children。
- * - 删除其它空壳 UL；Toolbar 作为兄弟节点插入（上/下）。
- * - cards 模式不触碰 UL，只插 Toolbar。
- * - 静默恢复：当 state.silentRestoreOnce 为真时，去掉本帧的 LoadingIndicator。
- * - “不滚回”的视觉：state.__hideListOnce 为真时，本帧隐藏列表；
- *   oncreate 同帧用锚点瞬移到目标帖子，再显示列表。
+ * 修复要点（仅此文件）：
+ * - 绝不新建第二个 <ul.DiscussionList-discussions>。
+ * - 深度遍历整棵 VDOM，原位找到现有的 UL，并只替换其 children（不改 attrs、不换节点）。
+ * - 若同时存在其它“空壳”UL，就地删除（父级 children 中 splice 掉）。
+ * - 工具条 Toolbar 仅作为 UL 的兄弟节点插入（上/下），不改动 UL 本体。
+ * - 在 cards 模式下完全不触碰 UL，只插 Toolbar。
+ * - 未找到 UL 时不做任何 UL 追加（避免制造第二个 UL）。
+ *
+ * 额外增强（与方案A匹配）：
+ * - 若 state.silentRestoreOnce 为 true（回退命中缓存的首帧），移除该帧中的 LoadingIndicator，避免闪烁；
+ *   仅影响该帧视觉，不改变任何数据/逻辑，下一帧自动恢复原状。
  */
 export default function () {
   override(DiscussionList.prototype, 'view', function (original) {
     const state = this.attrs?.state;
     const tree = original();
 
-    // 根节点类
+    // 给根增加类（不影响结构）
     tree.attrs = tree.attrs || {};
     tree.attrs.className = classList(
       'DiscussionList',
@@ -27,7 +31,7 @@ export default function () {
       tree.attrs.className
     );
 
-    // 静默恢复：移除本帧 LoadingIndicator
+    // --- [SilentRestore]：移除本帧 LoadingIndicator，避免“回退命中缓存”时的一闪 ---
     if (state?.silentRestoreOnce) {
       const getClass = (attrs) => String((attrs && (attrs.className || attrs.class)) || '');
       const isLoadingIndicator = (n) => n && typeof n === 'object' && n.attrs && getClass(n.attrs).includes('LoadingIndicator');
@@ -56,40 +60,16 @@ export default function () {
         }
       })(tree);
     }
+    // --- [SilentRestore] 结束 ---
 
-    // ★ 不滚回：首帧隐藏 + oncreate 瞬移锚点后再显示
-    if (state?.__hideListOnce) {
-      const oldStyle = tree.attrs.style || '';
-      tree.attrs.style = (oldStyle ? oldStyle + ';' : '') + 'visibility:hidden';
-
-      const prevOncreate = tree.attrs.oncreate;
-      tree.attrs.oncreate = function (vnode) {
-        if (typeof prevOncreate === 'function') prevOncreate.call(this, vnode);
-        try {
-          if (window.__dlRestoreFromAnchor && state.__pendingAnchor) {
-            const docEl = document.documentElement;
-            const prev = docEl.style.scrollBehavior;
-            docEl.style.scrollBehavior = 'auto'; // 关闭平滑滚动，确保无“滚动感”
-            window.__dlRestoreFromAnchor(state.__pendingAnchor);
-            docEl.style.scrollBehavior = prev || '';
-          }
-        } catch {}
-        // 清理一次性标记并恢复可见
-        state.__pendingAnchor = null;
-        state.__hideListOnce = false;
-        // 下一帧显示
-        if (typeof m !== 'undefined' && m.redraw) m.redraw();
-      };
-    }
-
-    // 非分页模式/加载中/空列表：不改 UL
+    // 非分页模式、加载中或空列表：不干预 UL，直接返回
     if (!state?.usePaginationMode || state.isLoading?.() || state.isEmpty?.()) {
       return tree;
     }
 
     const cardSupport = 'walsgit-discussion-cards' in flarum.extensions;
 
-    // 取当前页 items
+    // 取当前页 items（用于生成 <li>）
     const pageSize = state.options?.perPage || 0;
     const pageNum = state.page || 1;
     const params = state.getParams?.() || {};
@@ -114,7 +94,7 @@ export default function () {
         ))
       : null;
 
-    // 工具
+    // 工具函数
     const getClass = (attrs) => String((attrs && (attrs.className || attrs.class)) || '');
     const isUlList = (n) => n && n.tag === 'ul' && getClass(n.attrs).includes('DiscussionList-discussions');
     const childrenRef = (nodeOrArr) => {
@@ -123,7 +103,7 @@ export default function () {
       return null;
     };
 
-    // 收集所有 UL
+    // 深度收集所有 UL 以及其父引用
     const uls = [];
     (function walk(node, parent, indexInParent) {
       if (!node) return;
@@ -139,25 +119,28 @@ export default function () {
       if (ch) for (let i = 0; i < ch.length; i++) walk(ch[i], node, i);
     })(tree, null, null);
 
-    // cards：只插 Toolbar
+    // cards 模式：不触碰 UL，只插 Toolbar
     if (cardSupport) {
       insertToolbars(position(), tree, uls.length ? uls[0] : null, state);
       return tree;
     }
 
-    // 非 cards：原位替换 children，移除空壳 UL
+    // 非 cards：只原位替换 UL 的 children，并去除空壳 UL
     if (uls.length > 0) {
+      // 选择要保留的 UL：优先已有 <li> 的；其次带 aria-busy 的；否则第一个
       let keep = uls.find(e => {
         const ch = childrenRef(e.node);
         return ch && ch.some(c => c && c.tag === 'li');
       }) || uls.find(e => e.node?.attrs && 'aria-busy' in e.node.attrs) || uls[0];
 
+      // 仅当我们生成了 liChildren 时才替换 children；否则保持原样
       if (liChildren) {
         const ch = childrenRef(keep.node);
         if (ch) { ch.splice(0, ch.length, ...liChildren); }
         else { keep.node.children = liChildren; }
       }
 
+      // 删除其它空壳 UL（没有 <li> 的）
       for (let i = uls.length - 1; i >= 0; i--) {
         const e = uls[i];
         if (e === keep) continue;
@@ -170,11 +153,12 @@ export default function () {
         }
       }
 
+      // 在保留的 UL 附近插入工具条
       insertToolbars(position(), tree, keep, state);
       return tree;
     }
 
-    // 未找到 UL：不新增 UL，仅在根插 Toolbar
+    // 若未找到任何 UL：不追加 UL，避免制造第二个；只按需在根加 Toolbar
     insertToolbars(position(), tree, null, state);
     return tree;
 
