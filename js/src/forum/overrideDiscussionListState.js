@@ -49,7 +49,6 @@ function buildSessionKey(state, page) {
     return null;
   }
 }
-
 function savePageCache(state, page, results) {
   try {
     const key = buildSessionKey(state, page);
@@ -59,12 +58,10 @@ function savePageCache(state, page, results) {
       (state.totalDiscussionCount && state.totalDiscussionCount()) ||
       (results && results.payload && results.payload.jsonapi && results.payload.jsonapi.totalResultsCount) ||
       0;
-
     const record = { ids, total, ts: Date.now(), perPage: state.options?.perPage || 20 };
     sessionStorage.setItem(key, JSON.stringify(record));
   } catch {}
 }
-
 function tryRestoreFromSession(state, page) {
   try {
     const key = buildSessionKey(state, page);
@@ -98,6 +95,13 @@ function tryRestoreFromSession(state, page) {
     return null;
   }
 }
+// ★ 失效（删除）某页的会话缓存，用于 Realtime/黄条强制走网络
+function invalidateSessionPage(state, page) {
+  try {
+    const key = buildSessionKey(state, page);
+    if (key) sessionStorage.removeItem(key);
+  } catch {}
+}
 
 export default function () {
   // 初始化分页选项
@@ -119,17 +123,20 @@ export default function () {
     this.optionInitialized = true;
   };
 
-  // 参数刷新 -> 回到第 1 页（保持原行为）
+  // 参数刷新 -> 回到第 1 页（保持原行为），并绕过一次会话缓存
   override(DiscussionListState.prototype, 'refreshParams', function (original, params, page = 1) {
     const ret = original(params, page);
     if (this.usePaginationMode && typeof this.refresh === 'function') {
       const goPage = 1;
+      // [Realtime-BYPASS] 黄条触发时强制网络请求
+      this.__bypassSessionOnce = true;
+      invalidateSessionPage(this, goPage);
       return Promise.resolve(ret).then(() => this.refresh(goPage));
     }
     return ret;
   });
 
-  // 刷新指定页（含：会话缓存直出 + 静默首帧 + URL 同步）
+  // 刷新指定页（含：会话缓存直出 + 静默首帧 + URL 同步；支持一次性绕过）
   override(DiscussionListState.prototype, 'refresh', function (original, page = 1) {
     if (!this.optionInitialized) this.initOptions();
 
@@ -145,28 +152,31 @@ export default function () {
       if (u) targetPage = u;
     }
 
-    // 会话缓存直出（不发请求）
-    const sessionResults = tryRestoreFromSession(this, targetPage);
-    if (sessionResults) {
-      this.silentRestoreOnce = true; // 首帧去 Loading
+    // 会话缓存直出（不发请求）——但允许被一次性绕过
+    if (!this.__bypassSessionOnce) {
+      const sessionResults = tryRestoreFromSession(this, targetPage);
+      if (sessionResults) {
+        this.silentRestoreOnce = true; // 首帧去 Loading
 
-      this.initialLoading = false;
-      this.loadingPrev = false;
-      this.loadingNext = false;
-      this.isRefreshing = false;
+        this.initialLoading = false;
+        this.loadingPrev = false;
+        this.loadingNext = false;
+        this.isRefreshing = false;
 
-      this.location = { page: targetPage };
-      setPageToURL(targetPage, true);
+        this.location = { page: targetPage };
+        setPageToURL(targetPage, true);
 
-      this.pages = [];
-      this.parseResults(this.location.page, sessionResults);
+        this.pages = [];
+        this.parseResults(this.location.page, sessionResults);
 
-      // ★ 修复点：用异步重绘，避免 Nested m.redraw.sync()
-      if (typeof m !== 'undefined' && m.redraw) m.redraw();
+        if (typeof m !== 'undefined' && m.redraw) m.redraw();
+        setTimeout(() => (this.silentRestoreOnce = false), 0);
 
-      setTimeout(() => (this.silentRestoreOnce = false), 0);
-      return Promise.resolve(sessionResults);
+        return Promise.resolve(sessionResults);
+      }
     }
+    // 用完即清（仅影响本次 refresh）
+    this.__bypassSessionOnce = false;
 
     this.initialLoading = true;
     this.loadingPrev = false;
@@ -388,7 +398,7 @@ export default function () {
     m.redraw();
   });
 
-  // Realtime 新内容：分页模式下刷新第 1 页（保持原修复）
+  // Realtime：分页模式下（倒计时结束）刷新第 1 页，但绕过一次会话缓存，确保拉到最新数据
   override(DiscussionListState.prototype, 'addDiscussion', function (original, discussion) {
     if (!this.usePaginationMode) return original(discussion);
 
@@ -396,9 +406,13 @@ export default function () {
     this.__rtRefreshTimer = setTimeout(() => {
       this.page = this.page || Stream({ number: 1, items: [] });
       this.location = { page: 1 };
+      // [Realtime-BYPASS]
+      this.__bypassSessionOnce = true;
+      invalidateSessionPage(this, 1);
       this.refresh(1);
     }, 50);
 
+    // 仍维护本地计数，避免统计突变（与原行为一致）
     const index = this.lastDiscussions.indexOf(discussion);
     if (index !== -1) {
       this.lastDiscussions.splice(index);
