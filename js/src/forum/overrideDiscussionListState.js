@@ -4,7 +4,7 @@ import DiscussionListState from 'flarum/forum/states/DiscussionListState';
 import Stream from 'flarum/common/utils/Stream';
 import determineMode from './utils/determineMode';
 
-/* -------------------- 路由/URL 工具 -------------------- */
+// ---------- 路由/URL 工具 ----------
 function getPageFromURL() {
   try {
     const p = new URL(window.location.href).searchParams.get('page');
@@ -35,10 +35,10 @@ function routeKey() {
   return location.pathname + location.search + (location.hash || '');
 }
 
-/* -------- “从帖子返回”标记：每次回退都当作首次挂载 -------- */
+// ---------- “从帖子返回”标记（用于每次回退都静默直出） ----------
 const PENDING_BACK_KEY = 'lbtc:dl:pendingBack';
-if (!window.__dlBackMarkerInstalled) {
-  window.__dlBackMarkerInstalled = true;
+if (!(window).__dlBackMarkerInstalled) {
+  (window).__dlBackMarkerInstalled = true;
   document.addEventListener('click', (ev) => {
     const target = ev.target;
     const a = target && (target.closest?.('a[href*="/d/"]'));
@@ -46,8 +46,6 @@ if (!window.__dlBackMarkerInstalled) {
       try {
         sessionStorage.setItem(PENDING_BACK_KEY, JSON.stringify({ t: Date.now(), base: routeKey() }));
       } catch {}
-      // 离开前保存锚点（见下）
-      saveAnchorBeforeLeave();
     }
   }, { capture: true, passive: true });
 }
@@ -62,84 +60,7 @@ function consumePendingBackForCurrentRoute() {
   } catch { return false; }
 }
 
-/* -------------------- 锚点保存/恢复（用于“不滚回”） -------------------- */
-const ANCHOR_KEY_PREFIX = 'lbtc:dl:anchor:';
-function headerOffsetGuess() {
-  const el = document.querySelector('.App-header, .Header, #header, header');
-  return el ? Math.max(0, el.getBoundingClientRect().height - 4) : 0;
-}
-function anchorStorageKey() {
-  return ANCHOR_KEY_PREFIX + (location.pathname + location.search + (location.hash || ''));
-}
-function saveAnchorBeforeLeave() {
-  try {
-    const items = Array.from(document.querySelectorAll('li.DiscussionListItem'));
-    const topEdge = headerOffsetGuess();
-    let topEl = null, minTop = Infinity;
-
-    for (const li of items) {
-      const r = li.getBoundingClientRect();
-      if (r.bottom <= topEdge) continue;
-      if (r.top >= topEdge && r.top < minTop) { topEl = li; minTop = r.top; }
-    }
-
-    let id, href, y = window.scrollY || document.documentElement.scrollTop || 0;
-    if (topEl) {
-      id = topEl.getAttribute('data-id') || undefined;
-      const a = topEl.querySelector('a[href*="/d/"]'); href = a?.getAttribute('href') || undefined;
-    }
-    sessionStorage.setItem(anchorStorageKey(), JSON.stringify({ id, href, y, t: Date.now() }));
-  } catch {}
-}
-function parseAnchor() {
-  try {
-    const raw = sessionStorage.getItem(anchorStorageKey());
-    if (!raw) return null;
-    const s = JSON.parse(raw);
-    if (!s || typeof s !== 'object') return null;
-    return s;
-  } catch { return null; }
-}
-function findTargetElementByAnchor(anchor) {
-  if (!anchor) return null;
-  if (anchor.id) {
-    const el = document.querySelector(`li.DiscussionListItem[data-id="${anchor.id}"]`);
-    if (el) return el;
-  }
-  if (anchor.href) {
-    const m = anchor.href.match(/\/d\/(\d+)/);
-    if (m) {
-      const el = document.querySelector(`li.DiscussionListItem a[href*="/d/${m[1]}"]`)?.closest('li.DiscussionListItem');
-      if (el) return el;
-    }
-  }
-  return null;
-}
-function restoreScrollFromAnchor(anchor) {
-  if (!anchor) return;
-  const offset = headerOffsetGuess();
-  const targetEl = findTargetElementByAnchor(anchor);
-  if (targetEl) {
-    const y = window.scrollY + targetEl.getBoundingClientRect().top - offset - 8;
-    requestAnimationFrame(() => window.scrollTo(0, Math.max(0, y)));
-    return;
-  }
-  if (typeof anchor.y === 'number') {
-    let tries = 0;
-    const max = 40;
-    const tick = () => {
-      const h = document.documentElement.scrollHeight || document.body.scrollHeight || 0;
-      if (h > anchor.y + 50 || tries >= max) {
-        requestAnimationFrame(() => window.scrollTo(0, Math.max(0, anchor.y - Math.max(0, offset))));
-      } else { tries++; setTimeout(tick, 50); }
-    };
-    tick();
-  }
-}
-// 暴露给视图层（用于 oncreate 中“瞬移到锚点”）
-window.__dlRestoreFromAnchor = restoreScrollFromAnchor;
-
-/* -------------------- 会话级页面缓存（回退直出） -------------------- */
+// ---------- 会话级页面缓存 ----------
 function buildSessionKey(state, page) {
   try {
     const req = state.requestParams ? state.requestParams() : {};
@@ -185,7 +106,7 @@ function tryRestoreFromSession(state, page) {
         (app.store.getById && app.store.getById(type, id)) ||
         (app.store.getBy && app.store.getBy(type, 'id', id)) ||
         null;
-      if (!model) return null; // 缺任一条则放弃会话恢复
+      if (!model) return null;
       models.push(model);
     }
 
@@ -206,7 +127,6 @@ function invalidateSessionPage(state, page) {
   } catch {}
 }
 
-/* -------------------- 主逻辑 -------------------- */
 export default function () {
   // 初始化分页选项
   DiscussionListState.prototype.initOptions = function () {
@@ -226,7 +146,7 @@ export default function () {
     this.lastRequestParams = {};
     this.optionInitialized = true;
 
-    // 第一次 refreshParams 标记（用于区分冷启动/回退 vs 后续黄条）
+    // “是否已处理过一次 refreshParams” 的标记（用于黄条/后续刷新）
     this.__paramsRefreshedOnce = false;
   };
 
@@ -272,11 +192,10 @@ export default function () {
       if (u) targetPage = u;
     }
 
-    // 会话缓存直出（不发请求）——但允许被一次性绕过
     if (!this.__bypassSessionOnce) {
       const sessionResults = tryRestoreFromSession(this, targetPage);
       if (sessionResults) {
-        this.silentRestoreOnce = true; // 首帧去 Loading
+        this.silentRestoreOnce = true;
 
         this.initialLoading = false;
         this.loadingPrev = false;
@@ -290,19 +209,11 @@ export default function () {
         this.parseResults(this.location.page, sessionResults);
 
         if (typeof m !== 'undefined' && m.redraw) m.redraw();
-
-        // ★ 为“看起来不滚回”：交给视图隐藏首帧并瞬移到锚点
-        const anchor = parseAnchor();
-        if (anchor) {
-          this.__pendingAnchor = anchor;
-          this.__hideListOnce = true;
-        }
-
         setTimeout(() => (this.silentRestoreOnce = false), 0);
+
         return Promise.resolve(sessionResults);
       }
     }
-    // 用完即清
     this.__bypassSessionOnce = false;
 
     this.initialLoading = true;
@@ -357,7 +268,7 @@ export default function () {
           results.payload = { jsonapi: { totalResultsCount: this.totalDiscussionCount() } };
 
           this.initialLoading = true;
-          if (typeof m !== 'undefined' && m.redraw) m.redraw();
+          m.redraw();
           return new Promise((resolve) => setTimeout(() => resolve(results), 50));
         }
       }
@@ -508,7 +419,7 @@ export default function () {
       }.bind(this),
     };
 
-    if (typeof m !== 'undefined' && m.redraw) m.redraw();
+    m.redraw();
   });
 
   // Realtime：倒计时结束 → 刷新第 1 页，但绕过一次会话缓存，确保拉到最新数据
@@ -533,7 +444,7 @@ export default function () {
       this.lastTotalDiscussionCount++;
       this.totalDiscussionCount(this.lastTotalDiscussionCount);
     }
-    if (typeof m !== 'undefined' && m.redraw) m.redraw();
+    m.redraw();
   });
 
   override(DiscussionListState.prototype, 'deleteDiscussion', function (original, discussion) {
@@ -544,7 +455,7 @@ export default function () {
       this.lastTotalDiscussionCount--;
       this.totalDiscussionCount(this.lastTotalDiscussionCount);
     }
-    if (typeof m !== 'undefined' && m.redraw) m.redraw();
+    m.redraw();
   });
 
   // 清理状态
