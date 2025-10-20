@@ -4,17 +4,14 @@ import DiscussionListState from 'flarum/forum/states/DiscussionListState';
 import Stream from 'flarum/common/utils/Stream';
 import determineMode from './utils/determineMode';
 
-// --- URL 持久化工具 ---
+// ---------- 路由/URL 工具 ----------
 function getPageFromURL() {
   try {
     const p = new URL(window.location.href).searchParams.get('page');
     const n = parseInt(p, 10);
     return Number.isFinite(n) && n > 0 ? n : null;
-  } catch {
-    return null;
-  }
+  } catch { return null; }
 }
-/** 将页码写到地址栏，并同步 Mithril 的当前路由项（replace，不新增历史） */
 function setPageToURL(n, replace = true) {
   try {
     const u = new URL(window.location.href);
@@ -30,8 +27,40 @@ function setPageToURL(n, replace = true) {
     }
   } catch {}
 }
+function routeKey() {
+  try {
+    const mAny = (window && window.m) || null;
+    if (mAny?.route?.get) return String(mAny.route.get());
+  } catch {}
+  return location.pathname + location.search + (location.hash || '');
+}
 
-// --- 会话级页面缓存（跨页面回退可直出首帧） ---
+// ---------- “从帖子返回”标记（用于每次回退都静默直出） ----------
+const PENDING_BACK_KEY = 'lbtc:dl:pendingBack';
+if (!(window).__dlBackMarkerInstalled) {
+  (window).__dlBackMarkerInstalled = true;
+  document.addEventListener('click', (ev) => {
+    const target = ev.target;
+    const a = target && (target.closest?.('a[href*="/d/"]'));
+    if (a) {
+      try {
+        sessionStorage.setItem(PENDING_BACK_KEY, JSON.stringify({ t: Date.now(), base: routeKey() }));
+      } catch {}
+    }
+  }, { capture: true, passive: true });
+}
+function consumePendingBackForCurrentRoute() {
+  try {
+    const raw = sessionStorage.getItem(PENDING_BACK_KEY);
+    if (!raw) return false;
+    const obj = JSON.parse(raw);
+    const ok = obj && obj.base === routeKey() && Date.now() - (obj.t || 0) < 10 * 60 * 1000;
+    if (ok) sessionStorage.removeItem(PENDING_BACK_KEY);
+    return !!ok;
+  } catch { return false; }
+}
+
+// ---------- 会话级页面缓存 ----------
 function buildSessionKey(state, page) {
   try {
     const req = state.requestParams ? state.requestParams() : {};
@@ -45,9 +74,7 @@ function buildSessionKey(state, page) {
       page: Number(page) || 1,
     };
     return 'lbtc:dl:pagecache:' + JSON.stringify(keyObj);
-  } catch {
-    return null;
-  }
+  } catch { return null; }
 }
 function savePageCache(state, page, results) {
   try {
@@ -79,7 +106,7 @@ function tryRestoreFromSession(state, page) {
         (app.store.getById && app.store.getById(type, id)) ||
         (app.store.getBy && app.store.getBy(type, 'id', id)) ||
         null;
-      if (!model) return null; // 缺任一条则放弃会话恢复
+      if (!model) return null;
       models.push(model);
     }
 
@@ -91,11 +118,8 @@ function tryRestoreFromSession(state, page) {
     const results = models;
     results.payload = { jsonapi: { totalResultsCount: rec.total || 0 }, links };
     return results;
-  } catch {
-    return null;
-  }
+  } catch { return null; }
 }
-// ★ 失效（删除）某页的会话缓存，用于 Realtime/黄条强制走网络
 function invalidateSessionPage(state, page) {
   try {
     const key = buildSessionKey(state, page);
@@ -121,22 +145,39 @@ export default function () {
     this.lastLoadedPage = {};
     this.lastRequestParams = {};
     this.optionInitialized = true;
+
+    // “是否已处理过一次 refreshParams” 的标记（用于黄条/后续刷新）
+    this.__paramsRefreshedOnce = false;
   };
 
-  // 参数刷新 -> 回到第 1 页（保持原行为），并绕过一次会话缓存
+  /**
+   * 参数刷新：
+   * - 若检测到“从帖子返回”的标记 → 当作首次挂载处理：尊重 URL ?page，不绕过会话缓存（静默直出）
+   * - 否则：
+   *   - 第一次触发：同上（兼容冷启动/直接访问）
+   *   - 后续触发（黄条、切换排序/筛选）：回到第1页，绕过一次会话缓存（强制网络）
+   */
   override(DiscussionListState.prototype, 'refreshParams', function (original, params, page = 1) {
     const ret = original(params, page);
-    if (this.usePaginationMode && typeof this.refresh === 'function') {
-      const goPage = 1;
-      // [Realtime-BYPASS] 黄条触发时强制网络请求
-      this.__bypassSessionOnce = true;
-      invalidateSessionPage(this, goPage);
+    if (!this.usePaginationMode || typeof this.refresh !== 'function') return ret;
+
+    const back = consumePendingBackForCurrentRoute();
+    const first = !this.__paramsRefreshedOnce;
+
+    if (back || first) {
+      this.__paramsRefreshedOnce = true;
+      const goPage = getPageFromURL() ?? (page ?? 1);
       return Promise.resolve(ret).then(() => this.refresh(goPage));
     }
-    return ret;
+
+    // 黄条/后续：强制到第1页 + 绕过一次会话缓存
+    const goPage = 1;
+    this.__bypassSessionOnce = true;
+    invalidateSessionPage(this, goPage);
+    return Promise.resolve(ret).then(() => this.refresh(goPage));
   });
 
-  // 刷新指定页（含：会话缓存直出 + 静默首帧 + URL 同步；支持一次性绕过）
+  // 刷新指定页（含：会话缓存直出 + 首帧静默 + URL 同步；支持一次性绕过）
   override(DiscussionListState.prototype, 'refresh', function (original, page = 1) {
     if (!this.optionInitialized) this.initOptions();
 
@@ -145,18 +186,16 @@ export default function () {
       return original(page);
     }
 
-    // 若未显式传或为 1，优先读 URL 的 ?page
     let targetPage = page;
     if (targetPage === undefined || targetPage === 1) {
       const u = getPageFromURL();
       if (u) targetPage = u;
     }
 
-    // 会话缓存直出（不发请求）——但允许被一次性绕过
     if (!this.__bypassSessionOnce) {
       const sessionResults = tryRestoreFromSession(this, targetPage);
       if (sessionResults) {
-        this.silentRestoreOnce = true; // 首帧去 Loading
+        this.silentRestoreOnce = true;
 
         this.initialLoading = false;
         this.loadingPrev = false;
@@ -175,7 +214,6 @@ export default function () {
         return Promise.resolve(sessionResults);
       }
     }
-    // 用完即清（仅影响本次 refresh）
     this.__bypassSessionOnce = false;
 
     this.initialLoading = true;
@@ -249,11 +287,7 @@ export default function () {
 
     const params = {
       ...reqParams,
-      page: {
-        ...reqParams.page,
-        offset: newOffset,
-        limit: newLimit,
-      },
+      page: { ...reqParams.page, offset: newOffset, limit: newLimit },
       include,
     };
 
@@ -280,12 +314,7 @@ export default function () {
 
     const pageNum = Number(pg);
     const links = results.payload?.links || {};
-    const page = {
-      number: pageNum,
-      items: results,
-      hasNext: !!links?.next,
-      hasPrev: !!links?.prev,
-    };
+    const page = { number: pageNum, items: results, hasNext: !!links?.next, hasPrev: !!links?.prev };
 
     this.hasPage = function (num) {
       const all = this.getPages(true);
@@ -293,10 +322,7 @@ export default function () {
       return all.some((p) => p.number === num);
     };
 
-    if (!this.hasPage(pageNum)) {
-      this.pages.push(page);
-    }
-
+    if (!this.hasPage(pageNum)) this.pages.push(page);
     this.pages = this.pages.sort((a, b) => a.number - b.number);
     this.location = { page: pageNum };
 
@@ -308,12 +334,10 @@ export default function () {
         this.lastTotalDiscussionCount === 0 ||
         this.isRefreshing
       ) {
-        // 重置缓存
         this.lastTotalDiscussionCount = this.totalDiscussionCount();
         this.lastDiscussions = new Array(this.lastTotalDiscussionCount);
         this.lastLoadedPage = {};
       } else {
-        // 继续累积缓存
         this.lastLoadedPage[pageNum] = page;
         const start = this.options.perPage * (pageNum - 1);
         const end = this.options.perPage * pageNum;
@@ -398,7 +422,7 @@ export default function () {
     m.redraw();
   });
 
-  // Realtime：分页模式下（倒计时结束）刷新第 1 页，但绕过一次会话缓存，确保拉到最新数据
+  // Realtime：倒计时结束 → 刷新第 1 页，但绕过一次会话缓存，确保拉到最新数据
   override(DiscussionListState.prototype, 'addDiscussion', function (original, discussion) {
     if (!this.usePaginationMode) return original(discussion);
 
@@ -406,13 +430,11 @@ export default function () {
     this.__rtRefreshTimer = setTimeout(() => {
       this.page = this.page || Stream({ number: 1, items: [] });
       this.location = { page: 1 };
-      // [Realtime-BYPASS]
       this.__bypassSessionOnce = true;
       invalidateSessionPage(this, 1);
       this.refresh(1);
     }, 50);
 
-    // 仍维护本地计数，避免统计突变（与原行为一致）
     const index = this.lastDiscussions.indexOf(discussion);
     if (index !== -1) {
       this.lastDiscussions.splice(index);
